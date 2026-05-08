@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 9/19/29 - 半自動版</title>
+    <title>撲克占卜 9/19/29 - 三張修正版</title>
     <style>
         :root {
             --bg-color: #121212;
-            --card-width: 80px;
-            --overlap-height: -95px;
+            --card-width: 82px;
+            --overlap-height: -105px; /* 露出的空間 */
             --highlight-color: #f1c40f;
             --error-color: #ff4757;
         }
@@ -22,51 +22,47 @@
             flex-direction: column;
             align-items: center;
             height: 100vh;
-            box-sizing: border-box;
+            overflow: hidden;
         }
-        h1 { font-size: 1.2rem; margin: 5px 0; }
-        .status { margin-bottom: 10px; color: #888; font-size: 0.8rem; }
+        h1 { font-size: 1.3rem; margin: 5px 0; letter-spacing: 2px; }
+        .status { margin-bottom: 10px; color: #888; font-size: 0.85rem; }
 
-        /* 遊戲區域 */
         .board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
+            gap: 8px;
             width: 100%;
-            max-width: 450px;
-            margin-bottom: 120px; /* 為底部按鈕留空間 */
+            max-width: 480px;
+            margin-bottom: 140px;
         }
         .row {
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 400px;
+            min-height: 450px;
             border: 1px solid #333;
-            border-radius: 10px;
-            padding-top: 5px;
-            background: rgba(255,255,255,0.03);
-            transition: all 0.3s;
-            position: relative;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.02);
+            transition: all 0.2s;
             cursor: pointer;
         }
         
-        /* 提示閃爍效果 */
         @keyframes breathe {
-            0% { box-shadow: 0 0 5px var(--highlight-color); border-color: #444; }
-            50% { box-shadow: 0 0 20px var(--highlight-color); border-color: var(--highlight-color); }
-            100% { box-shadow: 0 0 5px var(--highlight-color); border-color: #444; }
+            0% { box-shadow: inset 0 0 5px var(--highlight-color); border-color: var(--highlight-color); }
+            50% { box-shadow: inset 0 0 25px var(--highlight-color); border-color: white; }
+            100% { box-shadow: inset 0 0 5px var(--highlight-color); border-color: var(--highlight-color); }
         }
         @keyframes alert-red {
             0% { background: transparent; }
-            50% { background: rgba(255, 71, 87, 0.4); }
+            50% { background: rgba(255, 71, 87, 0.5); }
             100% { background: transparent; }
         }
-        .row.can-match { animation: breathe 1.5s infinite; }
-        .row.must-action { animation: alert-red 0.4s infinite; border-color: var(--error-color) !important; }
-        .row.locked { opacity: 0.3; border-color: #550000; pointer-events: none; }
+        .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; }
+        .row.must-action { animation: alert-red 0.3s infinite; border-color: var(--error-color) !important; z-index: 50; }
+        .row.locked { opacity: 0.2; pointer-events: none; background: #000; }
 
-        .card-container { width: var(--card-width); position: relative; }
-        .card-img { width: 100%; height: auto; border-radius: 5px; display: block; box-shadow: 0 2px 6px rgba(0,0,0,0.8); }
+        .card-container { width: var(--card-width); position: relative; transition: transform 0.2s; }
+        .card-img { width: 100%; height: auto; border-radius: 5px; display: block; box-shadow: 0 3px 8px rgba(0,0,0,0.6); }
         .card-container:not(:first-child) { margin-top: var(--overlap-height); }
 
         /* 底部控制欄 */
@@ -75,43 +71,32 @@
             bottom: 0;
             left: 0;
             width: 100%;
-            background: #222;
-            padding: 20px 0 calc(env(safe-area-inset-bottom) + 15px);
+            background: #1e1e1e;
+            padding: 15px 0 calc(env(safe-area-inset-bottom) + 15px);
             display: flex;
             justify-content: center;
-            gap: 20px;
-            border-top: 1px solid #444;
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+            gap: 15px;
+            border-top: 1px solid #333;
             z-index: 100;
         }
         .btn {
-            padding: 12px 25px;
+            padding: 14px 28px;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 800;
             border: none;
-            border-radius: 30px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: transform 0.1s;
         }
-        .btn:active { transform: scale(0.95); }
-        .btn-new { background: #555; color: white; }
-        .btn-draw { background: #e67e22; color: white; flex-grow: 0.5; max-width: 200px; }
-        .btn:disabled { background: #333; color: #777; }
+        .btn-new { background: #444; color: #ccc; }
+        .btn-draw { background: #d35400; color: white; flex-grow: 0.4; }
+        .btn:disabled { background: #222; color: #555; }
 
-        /* 結果面板 */
         .result-panel {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #2c3e50;
-            padding: 25px;
-            border-radius: 15px;
-            text-align: center;
-            z-index: 200;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            border: 2px solid #3498db;
-            width: 80%;
+            top: 45%; left: 50%; transform: translate(-50%, -50%);
+            background: #2c3e50; padding: 30px; border-radius: 20px;
+            text-align: center; z-index: 200; width: 75%;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9); border: 3px solid #f1c40f;
         }
     </style>
 </head>
@@ -130,7 +115,7 @@
     <div id="result" class="result-panel" style="display: none;"></div>
 
     <div class="controls-footer">
-        <button class="btn btn-new" onclick="game.init()">重新開始</button>
+        <button class="btn btn-new" onclick="game.init()">新遊戲</button>
         <button class="btn btn-draw" id="next-btn" onclick="game.drawNext()">翻下一張</button>
     </div>
 
@@ -142,7 +127,7 @@
             rows: [[], [], [], []],
             locked: [false, false, false, false],
             currentIndex: 0,
-            pendingMatch: -1, // 紀錄哪一排需要先處理
+            pendingMatch: -1,
 
             init() {
                 const suits = ['C', 'D', 'H', 'S'];
@@ -168,11 +153,10 @@
             },
 
             drawNext() {
-                // 防呆提醒：如果現在有排可以消除，強制先消除
                 if (this.pendingMatch !== -1) {
                     const el = document.getElementById(`row-${this.pendingMatch}`);
                     el.classList.add('must-action');
-                    setTimeout(() => el.classList.remove('must-action'), 1200);
+                    setTimeout(() => el.classList.remove('must-action'), 800);
                     return;
                 }
 
@@ -189,7 +173,7 @@
                 const card = this.deck.shift();
                 this.rows[this.currentIndex].push(card);
                 
-                // 檢查是否符合消除條件 (不自動消除，改為標示)
+                // 檢查規則：頭兩張 + 最後一張
                 this.checkStatus(this.currentIndex);
                 
                 this.currentIndex = (this.currentIndex + 1) % 4;
@@ -200,9 +184,14 @@
 
             checkStatus(rowIndex) {
                 const row = this.rows[rowIndex];
-                if (row.length < 4) return;
-                const sum = this.getVal(row[row.length-1].rank) + 
-                            this.getVal(row[0].rank) + this.getVal(row[1].rank) + this.getVal(row[2].rank);
+                // 必須至少有三張牌才能觸發消除 (最前兩張 + 最後一張)
+                if (row.length < 3) return;
+
+                const firstVal = this.getVal(row[0].rank);
+                const secondVal = this.getVal(row[1].rank);
+                const lastVal = this.getVal(row[row.length - 1].rank);
+                
+                const sum = firstVal + secondVal + lastVal;
 
                 if ([9, 19, 29].includes(sum)) {
                     this.pendingMatch = rowIndex;
@@ -213,10 +202,10 @@
 
             handleRowClick(rowIndex) {
                 if (this.pendingMatch === rowIndex) {
-                    // 執行手動消除
                     const row = this.rows[rowIndex];
-                    row.splice(row.length - 1, 1);
-                    row.splice(0, 3);
+                    // 消除最前面兩張與最後一張
+                    row.splice(row.length - 1, 1); // 刪除最後一張
+                    row.splice(0, 2);              // 刪除前兩張
                     
                     if (row.length === 0) this.locked[rowIndex] = true;
                     this.pendingMatch = -1;
@@ -228,10 +217,7 @@
 
             endGame() {
                 const all = this.rows.flat();
-                if (all.length > 1 && this.deck.length === 0) {
-                    // 檢查是否還有任何可能存在的消除（防止發完牌後還有沒點的）
-                    if (this.pendingMatch === -1) this.showResult(all);
-                } else if (all.length <= 1) {
+                if (this.deck.length === 0 && this.pendingMatch === -1) {
                     this.showResult(all);
                 }
             },
@@ -243,21 +229,20 @@
 
                 if (remaining.length === 1) {
                     const final = remaining[0];
-                    const luckMap = { 'S': '普通', 'H': '極佳', 'D': '財運好', 'C': '勤奮收穫' };
-                    resultDiv.innerHTML = `<h2>運勢：${luckMap[final.suit]}</h2><p>只剩一張 ${final.rank}${final.suit}，運氣不錯！</p><button class="btn btn-new" onclick="game.init()">再試一次</button>`;
+                    const luckMap = { 'S': '沉穩', 'H': '熱情', 'D': '豐盛', 'C': '踏實' };
+                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">今日運勢：${luckMap[final.suit]}</h2><p>最後一張牌是 ${final.rank}${final.suit}</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">再占一次</button>`;
                 } else {
-                    resultDiv.innerHTML = `<h2>運氣爆炸</h2><p>剩下 ${remaining.length} 張牌，今天不太順喔。</p><button class="btn btn-new" onclick="game.init()">重整心情</button>`;
+                    resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>剩餘 ${remaining.length} 張牌，建議多休息。</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">重新挑戰</button>`;
                 }
             },
 
             render() {
-                document.getElementById('deck-count').innerText = `剩餘張數：${this.deck.length}`;
+                document.getElementById('deck-count').innerText = `剩餘：${this.deck.length}`;
                 for (let i = 0; i < 4; i++) {
                     const rowEl = document.getElementById(`row-${i}`);
                     rowEl.innerHTML = '';
-                    
-                    // 移除所有提醒樣式
                     rowEl.classList.remove('can-match', 'must-action');
+                    
                     if (this.locked[i]) rowEl.classList.add('locked');
                     if (this.pendingMatch === i) rowEl.classList.add('can-match');
 
