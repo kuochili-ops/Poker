@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>撲克牌圖案展示 - xcards</title>
+    <title>XCards 展示 - 最終修正版</title>
     <style>
         body {
-            font-family: -apple-system, sans-serif;
-            background-color: #f0f2f5;
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: #f8f9fa;
             margin: 0;
             padding: 20px;
             text-align: center;
@@ -23,16 +23,18 @@
             background: white;
             border-radius: 8px;
             padding: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            border: 1px solid #eee;
         }
         .card-wrapper img {
             width: 100%;
             height: auto;
+            display: block;
         }
         .card-label {
             margin-top: 8px;
-            font-size: 12px;
-            color: #666;
+            font-size: 13px;
+            color: #444;
             font-weight: bold;
         }
     </style>
@@ -47,45 +49,42 @@
         const baseUrl = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/face/";
         const gallery = document.getElementById('gallery');
 
-        // 定義該 Repo 的命名規則
-        const suits = ['C', 'D', 'H', 'S']; // 梅花, 方塊, 紅心, 黑桃
-        const ranks = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        // 花色：C=Clubs, D=Diamonds, H=Hearts, S=Spades
+        const suits = ['C', 'D', 'H', 'S'];
+        // 點數：1=A, 10=T, 以及 J, Q, K
+        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'];
 
-        // 對應顯示名稱
         const suitNames = { 'C': '梅花', 'D': '方塊', 'H': '紅心', 'S': '黑桃' };
 
         function createCard(fileName, label) {
             const div = document.createElement('div');
             div.className = 'card-wrapper';
             div.innerHTML = `
-                <img src="${baseUrl}${fileName}.svg" alt="${label}" onerror="console.log('Failed: ${fileName}')">
+                <img src="${baseUrl}${fileName}.svg" alt="${label}" onerror="this.parentElement.style.display='none'">
                 <div class="card-label">${label}</div>
             `;
             return div;
         }
 
-        // 生成 52 張標準牌
+        // 遍歷生成 52 張牌
         suits.forEach(suit => {
             ranks.forEach(rank => {
-                // 根據截圖，點數在前，花色大寫在後
+                // 格式：點數+花色 (例如 AC.svg, TC.svg, 2C.svg)
                 const fileName = `${rank}${suit}`;
-                const label = `${suitNames[suit]} ${rank === '1' ? 'A' : rank}`;
+                const label = `${suitNames[suit]} ${rank.replace('T', '10')}`;
                 gallery.appendChild(createCard(fileName, label));
             });
         });
 
-        // 加入鬼牌 (根據該 Repo 可能的命名，通常是 JB 和 JR)
-        gallery.appendChild(createCard('JB', '黑鬼牌 (JB)'));
-        gallery.appendChild(createCard('JR', '紅鬼牌 (JR)'));
-
-        // 加入卡片背面
-        const backDiv = document.createElement('div');
-        backDiv.className = 'card-wrapper';
-        backDiv.innerHTML = `
-            <img src="https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/back/b1.svg" alt="Back">
-            <div class="card-label">背面 (b1)</div>
-        `;
-        gallery.appendChild(backDiv);
+        // 額外加入鬼牌與背面
+        gallery.appendChild(createCard('JB', '黑小丑 (JB)'));
+        gallery.appendChild(createCard('JR', '紅小丑 (JR)'));
+        
+        // 背面圖片
+        const backImg = createCard('../back/b1', '背面 (B1)');
+        // 移除 onerror 隱藏邏輯，因為背面在不同目錄
+        backImg.querySelector('img').onerror = null; 
+        gallery.appendChild(backImg);
 
     </script>
 </body>
