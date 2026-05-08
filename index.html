@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>撲克牌圖案展示 - xcards</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+        }
+
+        .deck-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .card-wrapper {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+
+        .card-wrapper:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-wrapper img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .card-label {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .section-title {
+            width: 100%;
+            max-width: 1200px;
+            margin: 40px 0 20px 0;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>XCards SVG 庫展示</h1>
+
+    <div id="gallery" class="deck-container">
+        </div>
+
+    <script>
+        const baseUrl = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/face/";
+        
+        // 定義花色與點數
+        const suits = ['h', 'd', 'c', 's']; // hearts, diamonds, clubs, spades
+        const ranks = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13'];
+        const rankNames = {
+            '1': 'A', '11': 'J', '12': 'Q', '13': 'K'
+        };
+        const suitNames = {
+            'h': '紅心 (Hearts)', 'd': '方塊 (Diamonds)', 'c': '梅花 (Clubs)', 's': '黑桃 (Spades)'
+        };
+
+        const gallery = document.getElementById('gallery');
+
+        function createCardElement(fileName, label) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'card-wrapper';
+
+            const img = document.createElement('img');
+            // 注意：xcards 命名格式通常為 {suit}{rank}.svg
+            img.src = `${baseUrl}${fileName}.svg`;
+            img.alt = label;
+            img.loading = "lazy"; // 延遲加載以優化性能
+
+            const text = document.createElement('div');
+            text.className = 'card-label';
+            text.textContent = label;
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(text);
+            return wrapper;
+        }
+
+        // 生成 52 張牌
+        suits.forEach(suit => {
+            ranks.forEach(rank => {
+                const fileName = `${suit}${rank}`;
+                const displayRank = rankNames[rank] || rank;
+                const label = `${suit.toUpperCase()} ${displayRank}`;
+                gallery.appendChild(createCardElement(fileName, label));
+            });
+        });
+
+        // 加入鬼牌 (Jokers) - 根據 xcards 結構通常為 j1, j2
+        gallery.appendChild(createCardElement('j1', '小丑 (Black Joker)'));
+        gallery.appendChild(createCardElement('j2', '小丑 (Red Joker)'));
+        
+        // 加入卡片背面
+        const backUrl = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/back/b1.svg";
+        const backWrapper = createCardElement('../back/b1', '卡片背面');
+        gallery.appendChild(backWrapper);
+
+    </script>
+</body>
+</html>
