@@ -34,7 +34,6 @@
         }
         h1 { font-size: 1.1rem; margin: 5px 0; letter-spacing: 1px; color: #f1c40f; }
         .status { color: #888; font-size: 0.85rem; }
-        .status span { color: var(--success-color); font-weight: bold; }
 
         .main-container {
             flex: 1;
@@ -54,19 +53,18 @@
             align-items: start;
         }
         
-        /* 避免跳動：固定容器最小高度並優化渲染層級 */
         .row {
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 600px; /* 增加保險高度 */
+            min-height: 600px;
             border: 1px solid #333;
             border-radius: 8px;
             background: rgba(255,255,255,0.02);
             transition: background 0.3s, border 0.3s;
             padding-bottom: 20px;
             position: relative;
-            contain: layout; /* 限制重繪範圍，減少跳動 */
+            contain: layout;
         }
         
         .row.row-locked {
@@ -85,7 +83,7 @@
 
         .card-container {
             width: var(--card-width);
-            height: 118px; /* 固定高度減少重排計算 */
+            height: 118px;
             position: relative;
             margin-top: var(--overlap-height);
             cursor: pointer;
@@ -93,12 +91,11 @@
         }
         .card-container:first-child { margin-top: 12px; }
 
-        /* 選中狀態：不改變實體寬高避免擠壓 */
         .card-container.selected img {
             outline: 4px solid var(--select-color);
             outline-offset: -4px;
             box-shadow: 0 0 15px var(--select-color);
-            transform: translateY(-5px); /* 往上飄一點但不影響排版 */
+            transform: translateY(-5px);
             z-index: 100;
         }
 
@@ -108,7 +105,6 @@
             border-radius: 6px;
             display: block;
             background: #fff;
-            transition: transform 0.2s;
         }
 
         .controls-footer {
@@ -220,17 +216,23 @@
                 return parseInt(rank);
             },
 
+            // 核心邏輯更新：檢查環狀組合資格
             hasAnyMatch() {
                 for(let i=0; i<4; i++) {
                     if (this.isRowLocked[i]) continue;
                     const r = this.rows[i];
                     if (r.length < 3) continue;
+
                     const v = r.map(c => this.getVal(c.rank));
-                    const last = v.length - 1;
+                    const L = v.length;
                     const check = (a, b, c) => [9, 19, 29].includes(a + b + c);
-                    if (check(v[last], v[last-1], v[last-2]) || 
-                        check(v[0], v[1], v[last]) || 
-                        check(v[0], v[last], v[last-1])) return i;
+
+                    // 1. 最後三張：L-1, L-2, L-3
+                    if (check(v[L-1], v[L-2], v[L-3])) return i;
+                    // 2. 最後二張 + 第一張：L-1, L-2, 0
+                    if (check(v[L-1], v[L-2], v[0])) return i;
+                    // 3. 最後一張 + 第一、二張：L-1, 0, 1
+                    if (check(v[L-1], v[0], v[1])) return i;
                 }
                 return -1;
             },
@@ -281,11 +283,22 @@
 
             verifyMatch(rowIdx) {
                 const row = this.rows[rowIdx];
-                const sum = this.selectedIndices.reduce((acc, curr) => acc + this.getVal(row[curr.idx].rank), 0);
-                if ([9, 19, 29].includes(sum)) {
-                    const indices = this.selectedIndices.map(s => s.idx).sort((a, b) => b - a);
+                const L = row.length;
+                // 取得選中的索引並排序
+                const sel = this.selectedIndices.map(s => s.idx).sort((a,b) => a-b);
+                const sum = sel.reduce((acc, idx) => acc + this.getVal(row[idx].rank), 0);
+
+                // 檢查是否符合環狀規則的位置
+                const isType1 = sel[0] === L-3 && sel[1] === L-2 && sel[2] === L-1; // 末三張
+                const isType2 = sel[0] === 0 && sel[1] === L-2 && sel[2] === L-1;   // 最後二 + 第一
+                const isType3 = sel[0] === 0 && sel[1] === 1 && sel[2] === L-1;     // 最後一 + 第一二
+
+                if ([9, 19, 29].includes(sum) && (isType1 || isType2 || isType3)) {
                     const matchedCards = [];
-                    indices.forEach(idx => matchedCards.push(row.splice(idx, 1)[0]));
+                    // 依照索引大到小刪除避免跑位
+                    const sortedIndices = [...sel].sort((a, b) => b - a);
+                    sortedIndices.forEach(idx => matchedCards.push(row.splice(idx, 1)[0]));
+                    
                     this.deck.push(...matchedCards.reverse()); 
                     if (row.length === 0) this.isRowLocked[rowIdx] = true;
                     this.selectedIndices = [];
@@ -346,7 +359,6 @@
                 document.getElementById('deck-count').innerText = this.deck.length;
                 this.rows.forEach((rowData, i) => {
                     const rowEl = document.getElementById(`row-${i}`);
-                    // 使用 DocumentFragment 減少 DOM 操作造成的跳動
                     const fragment = document.createDocumentFragment();
                     
                     if (this.isRowLocked[i]) rowEl.classList.add('row-locked');
@@ -365,7 +377,6 @@
                         const img = document.createElement('img');
                         img.src = `${baseUrl}${card.rank}${card.suit}.svg`;
                         img.className = 'card-img';
-                        img.loading = "eager"; // 強制優先載入
                         
                         container.appendChild(img);
                         fragment.appendChild(container);
