@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 9/19/29 - 視覺優化版</title>
+    <title>撲克占卜 9/19/29 - 堆疊修正版</title>
     <style>
         :root {
             --bg-color: #121212;
-            --card-width: 84px; /* 微調寬度 */
-            --overlap-height: -120px; /* 增加間距，讓上一張牌的數字花色更清晰 */
+            --card-width: 84px;
+            --overlap-height: -115px; /* 露出的空間 */
             --highlight-color: #f1c40f;
             --error-color: #ff4757;
         }
@@ -46,7 +46,7 @@
             transition: all 0.2s;
             cursor: pointer;
             position: relative;
-            padding-bottom: 50px; /* 增加底部緩衝空間 */
+            padding-bottom: 60px; /* 增加底部緩衝 */
         }
         
         @keyframes breathe {
@@ -59,22 +59,37 @@
             50% { background: rgba(255, 71, 87, 0.5); }
             100% { background: transparent; }
         }
-        .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; z-index: 10; }
-        .row.must-action { animation: alert-red 0.3s infinite; border-color: var(--error-color) !important; z-index: 50; }
+        .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; }
+        .row.must-action { animation: alert-red 0.3s infinite; border-color: var(--error-color) !important; z-index: 1000; }
         .row.locked { opacity: 0.2; pointer-events: none; background: #000; border-style: dashed; }
 
-        .card-container { width: var(--card-width); position: relative; transition: all 0.3s ease; }
-        .card-img { width: 100%; height: auto; border-radius: 5px; display: block; box-shadow: 0 4px 10px rgba(0,0,0,0.7); }
+        .card-container {
+            width: var(--card-width);
+            position: relative;
+            transition: transform 0.2s;
+            /* 預設 Z-Index 為 1，防止底層覆蓋問題 */
+            z-index: 1; 
+        }
+        .card-img {
+            width: 100%;
+            height: auto;
+            border-radius: 5px;
+            display: block;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+        }
         
-        /* 堆疊邏輯：讓下一張牌往下移更多，露出上一張的左上角 */
-        .card-container:not(:first-child) { margin-top: var(--overlap-height); }
+        /* 堆疊邏輯 */
+        .card-container:not(:first-child) {
+            margin-top: var(--overlap-height);
+        }
 
-        .row.can-match .card-container:first-child,
-        .row.can-match .card-container:nth-child(2),
-        .row.can-match .card-container:last-child {
-            filter: brightness(1.2) saturate(1.2);
-            transform: scale(1.05);
-            z-index: 5;
+        /* 消除狀態下的視覺突出顯示 (套用到這三張牌的容器上) */
+        .card-container.target-elimination {
+            filter: brightness(1.3) saturate(1.2);
+            transform: scale(1.03);
+            border: 2px solid var(--highlight-color);
+            border-radius: 7px;
+            box-shadow: 0 0 15px var(--highlight-color);
         }
 
         .controls-footer {
@@ -233,8 +248,8 @@
 
                 if (remaining.length === 1) {
                     const final = remaining[0];
-                    const luckMap = { 'S': '沉穩冷靜', 'H': '心想事成', 'D': '大發利市', 'C': '勤勉有成' };
-                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">占卜完畢</h2><p style="font-size:1.1rem">${luckMap[final.suit]}<br>牌：${final.rank}${final.suit}</p><button class="btn btn-draw" style="width:100%;margin-top:10px" onclick="game.init()">再占一次</button>`;
+                    const luckMap = { 'S': '沉穩應對', 'H': '心想事成', 'D': '財富增長', 'C': '勤勉得福' };
+                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">占卜結果</h2><p style="font-size:1.1rem">${luckMap[final.suit]}</p><button class="btn btn-draw" style="width:100%;margin-top:10px" onclick="game.init()">再占一次</button>`;
                 } else {
                     resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>剩餘 ${remaining.length} 張牌。</p><button class="btn btn-draw" style="width:100%;margin-top:10px" onclick="game.init()">重新挑戰</button>`;
                 }
@@ -250,9 +265,24 @@
                     if (this.locked[i]) rowEl.classList.add('locked');
                     if (this.pendingMatch === i) rowEl.classList.add('can-match');
 
-                    this.rows[i].forEach(card => {
+                    const currentRow = this.rows[i];
+                    const totalCards = currentRow.length;
+
+                    currentRow.forEach((card, index) => {
                         const container = document.createElement('div');
                         container.className = 'card-container';
+                        
+                        // 修正關鍵：逆向 Z-Index，越前面的牌層級越高
+                        // 賦予 1 到 totalCards 的逆向值
+                        container.style.zIndex = totalCards - index + 1; 
+
+                        // 如果符合消除條件，並且是這三張目標牌中的一張，標示出來
+                        if (this.pendingMatch === i) {
+                            if (index === 0 || index === 1 || index === totalCards - 1) {
+                                container.classList.add('target-elimination');
+                            }
+                        }
+
                         const img = document.createElement('img');
                         img.src = `${baseUrl}${card.rank}${card.suit}.svg`;
                         img.className = 'card-img';
