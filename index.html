@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 - 滾動優化版</title>
+    <title>撲克占卜 - 最終揭曉版</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -11,6 +11,7 @@
             --overlap-height: -82px; 
             --error-color: #ff4757;
             --select-color: #f1c40f;
+            --success-color: #2ecc71;
         }
         body {
             font-family: -apple-system, sans-serif;
@@ -21,10 +22,9 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            overflow: hidden; /* 防止全畫面滾動 */
+            overflow: hidden;
         }
         
-        /* 固定標題區域 */
         header {
             padding: 10px;
             text-align: center;
@@ -32,15 +32,15 @@
             z-index: 1000;
             box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
-        h1 { font-size: 1.2rem; margin: 5px 0; letter-spacing: 1px; }
+        h1 { font-size: 1.1rem; margin: 5px 0; letter-spacing: 1px; color: #ccc; }
         .status { color: #888; font-size: 0.85rem; }
+        .status span { color: var(--success-color); font-weight: bold; }
 
-        /* 可捲動的遊戲區域 */
         .main-container {
             flex: 1;
-            overflow-y: auto; /* 允許垂直滾動 */
+            overflow-y: auto;
             -webkit-overflow-scrolling: touch;
-            padding: 10px 10px 180px 10px; /* 底部留白給功能鍵 */
+            padding: 10px 10px 180px 10px;
             display: flex;
             justify-content: center;
         }
@@ -71,7 +71,6 @@
             100% { border-color: #333; }
         }
         .row.must-action { animation: alert-red 0.3s 2; z-index: 200; }
-        .row.locked { opacity: 0.2; pointer-events: none; background: #000; }
 
         .card-container {
             width: var(--card-width);
@@ -82,14 +81,10 @@
         }
         .card-container:first-child { margin-top: 12px; }
 
-        @keyframes card-glow {
-            0% { filter: brightness(1); }
-            50% { filter: brightness(1.5); transform: scale(1.05); }
-            100% { filter: brightness(1.2); transform: scale(1.05); }
-        }
         .card-container.selected {
             z-index: 100 !important;
-            animation: card-glow 0.4s forwards;
+            filter: brightness(1.2);
+            transform: scale(1.05);
         }
         .card-container.selected img {
             outline: 4px solid var(--select-color);
@@ -105,20 +100,19 @@
             background: white; 
         }
 
-        /* 浮在最上層的功能鍵區域 */
         .controls-footer {
             position: fixed;
             bottom: 0;
             left: 0;
             width: 100%;
-            background: rgba(30, 30, 30, 0.85);
-            backdrop-filter: blur(10px); /* 毛玻璃效果 */
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(10px);
             padding: 15px 0 calc(env(safe-area-inset-bottom) + 15px);
             display: flex;
             justify-content: center;
             gap: 15px;
             border-top: 1px solid #333;
-            z-index: 2000; /* 確保在所有牌之上 */
+            z-index: 2000;
         }
         .btn {
             padding: 14px 28px;
@@ -127,25 +121,50 @@
             border: none;
             border-radius: 12px;
             cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         .btn-new { background: #444; color: #ccc; }
         .btn-draw { background: #d35400; color: white; flex-grow: 0.4; }
 
+        /* 結果顯示面板 */
         .result-panel {
             position: fixed;
-            top: 45%; left: 50%; transform: translate(-50%, -50%);
-            background: #2c3e50; padding: 30px; border-radius: 20px;
-            text-align: center; z-index: 3000; width: 80%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.9); border: 3px solid var(--select-color);
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(20, 30, 48, 0.95);
+            padding: 40px 20px;
+            border-radius: 24px;
+            text-align: center;
+            z-index: 3000;
+            width: 85%;
+            box-shadow: 0 0 100px rgba(0,0,0,1);
+            border: 2px solid var(--select-color);
+            display: none;
+            animation: fadeIn 0.5s ease-out;
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -40%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+
+        .final-card-display {
+            width: 180px;
+            margin: 20px auto;
+            perspective: 1000px;
+        }
+        .final-card-display img {
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            border: 2px solid white;
+            animation: cardPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes cardPop { from { transform: scale(0.5) rotateY(90deg); } to { transform: scale(1) rotateY(0); } }
+
+        .result-title { font-size: 1.5rem; color: var(--select-color); margin-bottom: 10px; }
+        .result-desc { color: #fff; margin-bottom: 25px; line-height: 1.6; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>撲克占卜 (滾動與圖層優化)</h1>
-        <div class="status" id="deck-count">剩餘牌數：40</div>
+        <h1>撲克占卜 (終極揭曉版)</h1>
+        <div class="status">待置放牌堆：<span id="deck-count">40</span></div>
     </header>
 
     <div class="main-container">
@@ -157,10 +176,12 @@
         </div>
     </div>
 
-    <div id="result" class="result-panel" style="display: none;"></div>
+    <div id="result" class="result-panel">
+        <div id="result-content"></div>
+    </div>
 
     <div class="controls-footer">
-        <button class="btn btn-new" onclick="game.init()">重新洗牌</button>
+        <button class="btn btn-new" onclick="game.init()">重新開始</button>
         <button class="btn btn-draw" id="next-btn" onclick="game.drawNext()">翻下一張</button>
     </div>
 
@@ -170,9 +191,9 @@
         const game = {
             deck: [],
             rows: [[], [], [], []],
-            locked: [false, false, false, false],
             selectedIndices: [], 
             currentIndex: 0,
+            isGameOver: false,
 
             init() {
                 const suits = ['C', 'D', 'H', 'S'];
@@ -182,9 +203,9 @@
                 this.deck.sort(() => Math.random() - 0.5);
                 
                 this.rows = [[], [], [], []];
-                this.locked = [false, false, false, false];
                 this.selectedIndices = [];
                 this.currentIndex = 0;
+                this.isGameOver = false;
                 
                 document.getElementById('result').style.display = 'none';
                 document.getElementById('next-btn').disabled = false;
@@ -212,30 +233,30 @@
             },
 
             drawNext() {
+                if (this.isGameOver) return;
+
                 const matchRow = this.hasAnyMatch();
                 if (matchRow !== -1) {
                     this.triggerError(matchRow);
                     return;
                 }
 
-                if (this.deck.length === 0) return;
-
-                let checked = 0;
-                while (this.locked[this.currentIndex] && checked < 4) {
-                    this.currentIndex = (this.currentIndex + 1) % 4;
-                    checked++;
-                }
-
-                if (checked === 4) { this.endGame(); return; }
+                if (this.deck.length === 0) {
+                    this.checkEndGame();
+                    return;
+                };
 
                 this.rows[this.currentIndex].push(this.deck.shift());
                 this.currentIndex = (this.currentIndex + 1) % 4;
                 this.render();
                 
-                if (this.deck.length === 0 && this.hasAnyMatch() === -1) this.endGame();
+                // 每次發完牌也檢查是否為最後一張
+                this.checkEndGame();
             },
 
             handleCardClick(rowIdx, cardIdx) {
+                if (this.isGameOver) return;
+                
                 if (this.selectedIndices.length > 0 && this.selectedIndices[0].row !== rowIdx) {
                     this.selectedIndices = [];
                 }
@@ -259,12 +280,14 @@
                 const sum = this.selectedIndices.reduce((acc, curr) => acc + this.getVal(row[curr.idx].rank), 0);
 
                 if ([9, 19, 29].includes(sum)) {
-                    const toDelete = this.selectedIndices.map(s => s.idx).sort((a, b) => b - a);
-                    toDelete.forEach(idx => row.splice(idx, 1));
-                    if (row.length === 0) this.locked[rowIdx] = true;
+                    const indices = this.selectedIndices.map(s => s.idx).sort((a, b) => b - a);
+                    const matchedCards = [];
+                    indices.forEach(idx => matchedCards.push(row.splice(idx, 1)[0]));
+                    
+                    this.deck.push(...matchedCards.reverse()); 
                     this.selectedIndices = [];
                     this.render();
-                    if (this.deck.length === 0 && this.hasAnyMatch() === -1) this.endGame();
+                    this.checkEndGame();
                 } else {
                     this.triggerError(rowIdx);
                     this.selectedIndices = [];
@@ -276,28 +299,53 @@
                 const el = document.getElementById(`row-${rowIdx}`);
                 el.classList.add('must-action');
                 setTimeout(() => el.classList.remove('must-action'), 800);
-                // 震動回饋 (如果手機支援)
-                if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate(200);
+            },
+
+            checkEndGame() {
+                const allOnBoard = this.rows.flat();
+                // 結束條件：牌堆已空 且 盤面僅剩一張
+                if (this.deck.length === 0 && allOnBoard.length === 1) {
+                    this.isGameOver = true;
+                    this.showFinalResult(allOnBoard[0]);
+                } else if (this.deck.length === 0 && this.hasAnyMatch() === -1) {
+                    // 如果牌堆空了且沒得消了，但剩超過一張
+                    this.isGameOver = true;
+                    this.showFinalResult(null, allOnBoard.length);
                 }
             },
 
-            endGame() {
-                const all = this.rows.flat();
+            showFinalResult(lastCard, count = 0) {
                 const resultDiv = document.getElementById('result');
-                resultDiv.style.display = 'block';
+                const resultContent = document.getElementById('result-content');
                 document.getElementById('next-btn').disabled = true;
-                resultDiv.innerHTML = `<h2>遊戲結束</h2><p>剩餘牌數：${all.length}</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">重新開始</button>`;
+                
+                if (lastCard) {
+                    const suitName = { 'S': '黑桃', 'H': '紅心', 'D': '方塊', 'C': '梅花' }[lastCard.suit];
+                    resultContent.innerHTML = `
+                        <div class="result-title">占卜大成功</div>
+                        <div class="result-desc">最後僅剩這張牌，這就是你的運勢指南：</div>
+                        <div class="final-card-display">
+                            <img src="${baseUrl}${lastCard.rank}${lastCard.suit}.svg">
+                        </div>
+                        <p style="font-size:1.2rem; margin-top:10px;">${suitName} ${lastCard.rank}</p>
+                        <button class="btn btn-draw" style="width:100%; margin-top:20px;" onclick="game.init()">重新開始</button>
+                    `;
+                } else {
+                    resultContent.innerHTML = `
+                        <div class="result-title" style="color:#ff4757">遊戲結束</div>
+                        <div class="result-desc">牌堆已空且無可消除組合。<br>盤面剩餘牌數：${count} 張</div>
+                        <button class="btn btn-draw" style="width:100%" onclick="game.init()">再試一次</button>
+                    `;
+                }
+                resultDiv.style.display = 'block';
             },
 
             render() {
-                document.getElementById('deck-count').innerText = `剩餘牌數：${this.deck.length}`;
+                document.getElementById('deck-count').innerText = this.deck.length;
                 for (let i = 0; i < 4; i++) {
                     const rowEl = document.getElementById(`row-${i}`);
                     rowEl.innerHTML = '';
-                    if (this.locked[i]) rowEl.classList.add('locked');
-                    else rowEl.classList.remove('locked');
-
+                    
                     this.rows[i].forEach((card, index) => {
                         const container = document.createElement('div');
                         container.className = 'card-container';
