@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 9/19/29 - 堆疊修正版</title>
+    <title>撲克占卜 9/19/29 - 疊加修正版</title>
     <style>
         :root {
             --bg-color: #121212;
-            --card-width: 84px;
-            --overlap-height: -115px; /* 露出的空間 */
+            --card-width: 82px;
+            /* 負值越大，蓋得越多；這裡調小一點，確保前牌露出頭部 */
+            --overlap-height: -100px; 
             --highlight-color: #f1c40f;
             --error-color: #ff4757;
         }
@@ -30,7 +31,7 @@
         .board {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
+            gap: 8px;
             width: 100%;
             max-width: 500px;
             margin-bottom: 140px;
@@ -46,7 +47,6 @@
             transition: all 0.2s;
             cursor: pointer;
             position: relative;
-            padding-bottom: 60px; /* 增加底部緩衝 */
         }
         
         @keyframes breathe {
@@ -59,37 +59,35 @@
             50% { background: rgba(255, 71, 87, 0.5); }
             100% { background: transparent; }
         }
-        .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; }
-        .row.must-action { animation: alert-red 0.3s infinite; border-color: var(--error-color) !important; z-index: 1000; }
-        .row.locked { opacity: 0.2; pointer-events: none; background: #000; border-style: dashed; }
+        .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; z-index: 100; }
+        .row.must-action { animation: alert-red 0.3s infinite; border-color: var(--error-color) !important; z-index: 200; }
+        .row.locked { opacity: 0.2; pointer-events: none; background: #000; }
 
         .card-container {
             width: var(--card-width);
             position: relative;
-            transition: transform 0.2s;
-            /* 預設 Z-Index 為 1，防止底層覆蓋問題 */
-            z-index: 1; 
+            /* 讓後一張蓋在前一張上面 */
+            margin-top: var(--overlap-height);
         }
+        /* 第一張牌不需要向上偏移 */
+        .card-container:first-child {
+            margin-top: 10px;
+        }
+
         .card-img {
             width: 100%;
             height: auto;
             border-radius: 5px;
             display: block;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.5); /* 陰影向上，增加堆疊感 */
+            background: white; /* 避免 SVG 透明度問題 */
         }
         
-        /* 堆疊邏輯 */
-        .card-container:not(:first-child) {
-            margin-top: var(--overlap-height);
-        }
-
-        /* 消除狀態下的視覺突出顯示 (套用到這三張牌的容器上) */
-        .card-container.target-elimination {
-            filter: brightness(1.3) saturate(1.2);
-            transform: scale(1.03);
-            border: 2px solid var(--highlight-color);
-            border-radius: 7px;
-            box-shadow: 0 0 15px var(--highlight-color);
+        /* 標示要消除的目標 */
+        .card-container.target-elimination img {
+            outline: 3px solid var(--highlight-color);
+            outline-offset: -3px;
+            filter: brightness(1.1);
         }
 
         .controls-footer {
@@ -103,7 +101,7 @@
             justify-content: center;
             gap: 15px;
             border-top: 1px solid #333;
-            z-index: 100;
+            z-index: 500;
         }
         .btn {
             padding: 14px 28px;
@@ -120,7 +118,7 @@
             position: fixed;
             top: 45%; left: 50%; transform: translate(-50%, -50%);
             background: #2c3e50; padding: 30px; border-radius: 20px;
-            text-align: center; z-index: 200; width: 75%;
+            text-align: center; z-index: 1000; width: 75%;
             box-shadow: 0 20px 50px rgba(0,0,0,0.9); border: 3px solid #f1c40f;
         }
     </style>
@@ -197,9 +195,7 @@
 
                 const card = this.deck.shift();
                 this.rows[this.currentIndex].push(card);
-                
                 this.checkStatus(this.currentIndex);
-                
                 this.currentIndex = (this.currentIndex + 1) % 4;
                 this.render();
 
@@ -209,16 +205,9 @@
             checkStatus(rowIndex) {
                 const row = this.rows[rowIndex];
                 if (row.length < 3) return;
-
-                const sum = this.getVal(row[0].rank) + 
-                            this.getVal(row[1].rank) + 
-                            this.getVal(row[row.length - 1].rank);
-
-                if ([9, 19, 29].includes(sum)) {
-                    this.pendingMatch = rowIndex;
-                } else {
-                    this.pendingMatch = -1;
-                }
+                const sum = this.getVal(row[0].rank) + this.getVal(row[1].rank) + this.getVal(row[row.length - 1].rank);
+                if ([9, 19, 29].includes(sum)) this.pendingMatch = rowIndex;
+                else this.pendingMatch = -1;
             },
 
             handleRowClick(rowIndex) {
@@ -226,10 +215,8 @@
                     const row = this.rows[rowIndex];
                     row.splice(row.length - 1, 1); 
                     row.splice(0, 2);              
-                    
                     if (row.length === 0) this.locked[rowIndex] = true;
                     this.pendingMatch = -1;
-                    
                     this.checkStatus(rowIndex);
                     this.render();
                     if (this.deck.length === 0 && this.pendingMatch === -1) this.endGame();
@@ -245,13 +232,11 @@
                 const resultDiv = document.getElementById('result');
                 resultDiv.style.display = 'block';
                 document.getElementById('next-btn').disabled = true;
-
                 if (remaining.length === 1) {
                     const final = remaining[0];
-                    const luckMap = { 'S': '沉穩應對', 'H': '心想事成', 'D': '財富增長', 'C': '勤勉得福' };
-                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">占卜結果</h2><p style="font-size:1.1rem">${luckMap[final.suit]}</p><button class="btn btn-draw" style="width:100%;margin-top:10px" onclick="game.init()">再占一次</button>`;
+                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">運勢：${final.rank}${final.suit}</h2><button class="btn btn-draw" style="width:100%" onclick="game.init()">重新開始</button>`;
                 } else {
-                    resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>剩餘 ${remaining.length} 張牌。</p><button class="btn btn-draw" style="width:100%;margin-top:10px" onclick="game.init()">重新挑戰</button>`;
+                    resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>剩 ${remaining.length} 張</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">再試一次</button>`;
                 }
             },
 
@@ -261,26 +246,18 @@
                     const rowEl = document.getElementById(`row-${i}`);
                     rowEl.innerHTML = '';
                     rowEl.classList.remove('can-match', 'must-action');
-                    
                     if (this.locked[i]) rowEl.classList.add('locked');
                     if (this.pendingMatch === i) rowEl.classList.add('can-match');
 
-                    const currentRow = this.rows[i];
-                    const totalCards = currentRow.length;
-
-                    currentRow.forEach((card, index) => {
+                    this.rows[i].forEach((card, index) => {
                         const container = document.createElement('div');
                         container.className = 'card-container';
                         
-                        // 修正關鍵：逆向 Z-Index，越前面的牌層級越高
-                        // 賦予 1 到 totalCards 的逆向值
-                        container.style.zIndex = totalCards - index + 1; 
+                        // 正確層級：越後面的牌 z-index 越高，蓋住前面的牌
+                        container.style.zIndex = index + 1;
 
-                        // 如果符合消除條件，並且是這三張目標牌中的一張，標示出來
-                        if (this.pendingMatch === i) {
-                            if (index === 0 || index === 1 || index === totalCards - 1) {
-                                container.classList.add('target-elimination');
-                            }
+                        if (this.pendingMatch === i && (index === 0 || index === 1 || index === this.rows[i].length - 1)) {
+                            container.classList.add('target-elimination');
                         }
 
                         const img = document.createElement('img');
@@ -292,7 +269,6 @@
                 }
             }
         };
-        
         game.init();
     </script>
 </body>
