@@ -3,98 +3,241 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XCards SVG 展示庫</title>
+    <title>撲克占卜：9, 19, 29 挑戰</title>
     <style>
         :root {
-            --bg-color: #e9ecef;
-            --card-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            --bg-color: #1a1a1a;
+            --card-width: 75px; /* 稍微縮小寬度以適應手機屏幕 */
+            --overlap-height: -85px; /* 控制重疊高度，露出左上角 */
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, sans-serif;
             background-color: var(--bg-color);
+            color: white;
             margin: 0;
-            padding: 40px 20px;
-            text-align: center;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
         }
-        h1 { color: #2c3e50; margin-bottom: 40px; font-weight: 300; }
-        
-        .deck-container {
+        h1 { font-size: 1.5rem; margin: 10px 0; }
+        .status { margin-bottom: 15px; color: #ccc; font-size: 0.9rem; }
+
+        .controls { 
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px; 
+        }
+        button {
+            padding: 10px 18px;
+            font-size: 14px;
+            cursor: pointer;
+            background: #d35400;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        button:disabled { background: #555; cursor: not-allowed; }
+
+        .board {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-            gap: 20px;
-            max-width: 1300px;
-            margin: 0 auto;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px; /* 縮小排間距 */
+            width: 100%;
+            max-width: 400px;
+            align-items: start;
         }
-        .card-wrapper {
-            background: white;
-            border-radius: 12px;
-            padding: 12px;
-            box-shadow: var(--card-shadow);
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        .row {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 300px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding-top: 5px;
+            background: rgba(255,255,255,0.02);
         }
-        .card-wrapper:hover {
-            transform: scale(1.08);
-            z-index: 10;
+        .row.locked { 
+            background-color: rgba(231, 76, 60, 0.1); 
+            border-color: #c0392b;
+            opacity: 0.5;
         }
-        .card-wrapper img {
+        
+        /* 卡片容器樣式 */
+        .card-container {
+            width: var(--card-width);
+            position: relative;
+        }
+        .card-img {
             width: 100%;
             height: auto;
-            display: block;
             border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            display: block;
         }
-        .card-label {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #555;
-            font-weight: 700;
-            letter-spacing: 1px;
+        /* 除了第一張牌，其餘牌向上位移形成堆疊 */
+        .card-container:not(:first-child) {
+            margin-top: var(--overlap-height);
+        }
+
+        .result-panel {
+            margin-top: 30px;
+            padding: 15px;
+            background: #2c3e50;
+            border-radius: 8px;
+            text-align: center;
+            width: 90%;
+            max-width: 350px;
+            border: 2px solid #34495e;
         }
     </style>
 </head>
 <body>
 
-    <h1>XCards SVG 展示</h1>
+    <h1>撲克占卜 9 / 19 / 29</h1>
+    <div class="status" id="deck-count">剩餘張數：52</div>
 
-    <div id="gallery" class="deck-container"></div>
+    <div class="controls">
+        <button onclick="game.init()">開始新遊戲</button>
+        <button id="next-btn" onclick="game.drawNext()" disabled>翻下一張</button>
+    </div>
+
+    <div class="board">
+        <div class="row" id="row-0"></div>
+        <div class="row" id="row-1"></div>
+        <div class="row" id="row-2"></div>
+        <div class="row" id="row-3"></div>
+    </div>
+
+    <div id="result" class="result-panel" style="display: none;"></div>
 
     <script>
-        const rawBase = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/";
-        const gallery = document.getElementById('gallery');
+        const baseUrl = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/face/";
+        
+        const game = {
+            deck: [],
+            rows: [[], [], [], []],
+            locked: [false, false, false, false],
+            currentIndex: 0,
 
-        // 定義規則
-        const suits = ['C', 'D', 'H', 'S']; // 梅花, 方塊, 紅心, 黑桃
-        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'];
+            init() {
+                const suits = ['C', 'D', 'H', 'S'];
+                const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'];
+                this.deck = [];
+                suits.forEach(s => ranks.forEach(r => this.deck.push({ rank: r, suit: s })));
+                
+                // 洗牌
+                this.deck.sort(() => Math.random() - 0.5);
+                
+                this.rows = [[], [], [], []];
+                this.locked = [false, false, false, false];
+                this.currentIndex = 0;
+                
+                document.getElementById('result').style.display = 'none';
+                document.getElementById('next-btn').disabled = false;
+                this.render();
+            },
 
-        const suitNames = { 'C': '♣', 'D': '♦', 'H': '♥', 'S': '♠' };
+            getVal(rank) {
+                if (rank === 'A') return 1;
+                if (['T', 'J', 'Q', 'K'].includes(rank)) return 10;
+                return parseInt(rank);
+            },
 
-        function addCardToGallery(path, label) {
-            const div = document.createElement('div');
-            div.className = 'card-wrapper';
-            div.innerHTML = `
-                <img src="${rawBase}${path}" alt="${label}" onerror="this.parentElement.style.display='none'">
-                <div class="card-label">${label}</div>
-            `;
-            gallery.appendChild(div);
-        }
+            drawNext() {
+                if (this.deck.length === 0) return;
 
-        // 1. 先加入背面 (依據需求使用 bicycle_blue.svg)
-        addCardToGallery('back/bicycle_blue.svg', 'BICYCLE BLUE');
+                // 跳過已鎖定的排
+                let checkedCount = 0;
+                while (this.locked[this.currentIndex] && checkedCount < 4) {
+                    this.currentIndex = (this.currentIndex + 1) % 4;
+                    checkedCount++;
+                }
 
-        // 2. 生成 52 張標準牌
-        suits.forEach(suit => {
-            ranks.forEach(rank => {
-                // 檔名：點數+花色 (例如 AS.svg, TS.svg, 2C.svg)
-                const fileName = `face/${rank}${suit}.svg`;
-                const displayRank = rank.replace('T', '10');
-                const label = `${suitNames[suit]}${displayRank}`;
-                addCardToGallery(fileName, label);
-            });
-        });
+                if (checkedCount === 4) {
+                    this.endGame();
+                    return;
+                }
 
-        // 3. 加入鬼牌 (Joker)
-        addCardToGallery('face/JB.svg', 'BLACK JOKER');
-        addCardToGallery('face/JR.svg', 'RED JOKER');
+                const card = this.deck.shift();
+                this.rows[this.currentIndex].push(card);
+                
+                // 檢查消除邏輯
+                this.checkMatch(this.currentIndex);
+                
+                // 指向下一排
+                this.currentIndex = (this.currentIndex + 1) % 4;
+                this.render();
 
+                if (this.deck.length === 0) this.endGame();
+            },
+
+            checkMatch(rowIndex) {
+                const row = this.rows[rowIndex];
+                if (row.length < 4) return;
+
+                const lastCard = row[row.length - 1];
+                const firstThree = row.slice(0, 3);
+                
+                const sum = this.getVal(lastCard.rank) + 
+                            firstThree.reduce((acc, c) => acc + this.getVal(c.rank), 0);
+
+                if ([9, 19, 29].includes(sum)) {
+                    // 消除首三張與最後一張
+                    row.splice(row.length - 1, 1);
+                    row.splice(0, 3);
+                    
+                    if (row.length === 0) {
+                        this.locked[rowIndex] = true;
+                    }
+                }
+            },
+
+            endGame() {
+                document.getElementById('next-btn').disabled = true;
+                const resultDiv = document.getElementById('result');
+                resultDiv.style.display = 'block';
+
+                const allRemaining = this.rows.flat();
+                
+                if (allRemaining.length === 1) {
+                    const final = allRemaining[0];
+                    const luckMap = {
+                        'S': '【黑桃】 今日運勢普通，宜靜不宜動。',
+                        'H': '【紅心】 運氣大好！今日人緣極佳，有貴人相助。',
+                        'D': '【方塊】 財運亨通，今日宜關注財務投資。',
+                        'C': '【梅花】 勤奮之日，腳踏實地必有收穫。'
+                    };
+                    resultDiv.innerHTML = `<h3>遊戲結束</h3><p style="color:#f1c40f; font-size:1.1rem;">${luckMap[final.suit]}</p>`;
+                } else {
+                    resultDiv.innerHTML = `<h3>遊戲結束</h3><p style="color: #ff4757; font-weight: bold;">運氣爆炸！最後剩餘 ${allRemaining.length} 張牌。</p>`;
+                }
+            },
+
+            render() {
+                document.getElementById('deck-count').innerText = `剩餘張數：${this.deck.length}`;
+                for (let i = 0; i < 4; i++) {
+                    const rowEl = document.getElementById(`row-${i}`);
+                    rowEl.innerHTML = '';
+                    if (this.locked[i]) rowEl.classList.add('locked');
+                    else rowEl.classList.remove('locked');
+
+                    this.rows[i].forEach(card => {
+                        const container = document.createElement('div');
+                        container.className = 'card-container';
+                        
+                        const img = document.createElement('img');
+                        img.src = `${baseUrl}${card.rank}${card.suit}.svg`;
+                        img.className = 'card-img';
+                        
+                        container.appendChild(img);
+                        rowEl.appendChild(container);
+                    });
+                }
+            }
+        };
     </script>
 </body>
 </html>
