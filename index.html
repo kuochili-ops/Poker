@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 - 多重消除版</title>
+    <title>撲克占卜 - 手動點選版</title>
     <style>
         :root {
             --bg-color: #121212;
             --card-width: 82px;
             --overlap-height: -82px; 
             --error-color: #ff4757;
-            --match-hint: #2ecc71;
+            --select-color: #f1c40f;
         }
         body {
             font-family: -apple-system, sans-serif;
@@ -22,9 +22,9 @@
             flex-direction: column;
             align-items: center;
             height: 100vh;
-            overflow-x: hidden;
+            overflow: hidden;
         }
-        h1 { font-size: 1.2rem; margin: 5px 0; letter-spacing: 1px; color: #eee; }
+        h1 { font-size: 1.2rem; margin: 5px 0; letter-spacing: 1px; }
         .status { margin-bottom: 10px; color: #888; font-size: 0.85rem; }
 
         .board {
@@ -44,31 +44,48 @@
             border-radius: 8px;
             background: rgba(255,255,255,0.02);
             transition: all 0.2s;
-            cursor: pointer;
             position: relative;
         }
         
+        /* 錯誤提醒動畫 */
         @keyframes alert-red {
-            0% { background: transparent; }
-            50% { background: rgba(255, 71, 87, 0.5); box-shadow: inset 0 0 15px var(--error-color); }
-            100% { background: transparent; }
+            0% { border-color: #333; }
+            50% { border-color: var(--error-color); box-shadow: inset 0 0 20px var(--error-color); }
+            100% { border-color: #333; }
         }
-        .row.must-action { animation: alert-red 0.3s 3; border-color: var(--error-color) !important; z-index: 200; }
-        .row.locked { opacity: 0.2; pointer-events: none; background: #000; border-style: dashed; }
+        .row.must-action { animation: alert-red 0.3s 2; z-index: 200; }
+        .row.locked { opacity: 0.2; pointer-events: none; background: #000; }
 
         .card-container {
             width: var(--card-width);
             position: relative;
             margin-top: var(--overlap-height);
+            transition: transform 0.2s;
+            cursor: pointer;
         }
         .card-container:first-child { margin-top: 12px; }
+
+        /* 被選中的牌反閃效果 */
+        @keyframes card-glow {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.5); transform: scale(1.05); }
+            100% { filter: brightness(1.2); transform: scale(1.05); }
+        }
+        .card-container.selected {
+            z-index: 100 !important;
+            animation: card-glow 0.4s forwards;
+        }
+        .card-container.selected img {
+            outline: 4px solid var(--select-color);
+            outline-offset: -4px;
+            box-shadow: 0 0 15px var(--select-color);
+        }
 
         .card-img {
             width: 100%;
             height: auto;
             border-radius: 6px;
             display: block;
-            box-shadow: 0 -2px 8px rgba(0,0,0,0.5); 
             background: white; 
         }
 
@@ -101,20 +118,20 @@
             top: 45%; left: 50%; transform: translate(-50%, -50%);
             background: #2c3e50; padding: 30px; border-radius: 20px;
             text-align: center; z-index: 1000; width: 80%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.9); border: 3px solid #f1c40f;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9); border: 3px solid var(--select-color);
         }
     </style>
 </head>
 <body>
 
-    <h1>撲克占卜 (多元消除)</h1>
+    <h1>撲克占卜 (點選判定版)</h1>
     <div class="status" id="deck-count">剩餘牌數：40</div>
 
     <div class="board">
-        <div class="row" id="row-0" onclick="game.handleRowClick(0)"></div>
-        <div class="row" id="row-1" onclick="game.handleRowClick(1)"></div>
-        <div class="row" id="row-2" onclick="game.handleRowClick(2)"></div>
-        <div class="row" id="row-3" onclick="game.handleRowClick(3)"></div>
+        <div class="row" id="row-0"></div>
+        <div class="row" id="row-1"></div>
+        <div class="row" id="row-2"></div>
+        <div class="row" id="row-3"></div>
     </div>
 
     <div id="result" class="result-panel" style="display: none;"></div>
@@ -131,8 +148,8 @@
             deck: [],
             rows: [[], [], [], []],
             locked: [false, false, false, false],
+            selectedIndices: [], // 格式: {row, idx}
             currentIndex: 0,
-            pendingRow: -1, // 紀錄哪一列有可消除組合
 
             init() {
                 const suits = ['C', 'D', 'H', 'S'];
@@ -143,8 +160,8 @@
                 
                 this.rows = [[], [], [], []];
                 this.locked = [false, false, false, false];
+                this.selectedIndices = [];
                 this.currentIndex = 0;
-                this.pendingRow = -1;
                 
                 document.getElementById('result').style.display = 'none';
                 document.getElementById('next-btn').disabled = false;
@@ -157,42 +174,27 @@
                 return parseInt(rank);
             },
 
-            // 核心邏輯：檢查該列是否有任何符合規定的三張組合
-            getMatchMode(row) {
-                if (row.length < 3) return null;
-                
-                const v = row.map(c => this.getVal(c.rank));
-                const last = v.length - 1;
-
-                // 模式 A: 最後三張 (Last 3)
-                const sumLast3 = v[last] + v[last-1] + v[last-2];
-                if ([9, 19, 29].includes(sumLast3)) return 'LAST3';
-
-                // 模式 B: 頭二尾一 (First 2 + Last 1)
-                const sumHeadTail = v[0] + v[1] + v[last];
-                if ([9, 19, 29].includes(sumHeadTail)) return 'HEADTAIL';
-
-                // 模式 C: 頭一尾二 (First 1 + Last 2)
-                const sumTailHead = v[0] + v[last] + v[last-1];
-                if ([9, 19, 29].includes(sumTailHead)) return 'TAILHEAD';
-
-                return null;
+            // 檢查全場是否有符合規則但未消除的組合 (用於翻牌前的提醒)
+            hasAnyMatch() {
+                for(let i=0; i<4; i++) {
+                    const r = this.rows[i];
+                    if (r.length < 3) continue;
+                    const v = r.map(c => this.getVal(c.rank));
+                    const last = v.length - 1;
+                    
+                    const check = (a, b, c) => [9, 19, 29].includes(a + b + c);
+                    
+                    if (check(v[last], v[last-1], v[last-2]) || 
+                        check(v[0], v[1], v[last]) || 
+                        check(v[0], v[last], v[last-1])) return i;
+                }
+                return -1;
             },
 
             drawNext() {
-                // 檢查全場是否有漏掉的組合
-                let foundMatch = -1;
-                for(let i=0; i<4; i++) {
-                    if (this.getMatchMode(this.rows[i])) {
-                        foundMatch = i;
-                        break;
-                    }
-                }
-
-                if (foundMatch !== -1) {
-                    const el = document.getElementById(`row-${foundMatch}`);
-                    el.classList.add('must-action');
-                    setTimeout(() => el.classList.remove('must-action'), 900);
+                const matchRow = this.hasAnyMatch();
+                if (matchRow !== -1) {
+                    this.triggerError(matchRow);
                     return;
                 }
 
@@ -209,37 +211,55 @@
                 this.rows[this.currentIndex].push(this.deck.shift());
                 this.currentIndex = (this.currentIndex + 1) % 4;
                 this.render();
+                
+                if (this.deck.length === 0 && this.hasAnyMatch() === -1) this.endGame();
+            },
 
-                if (this.deck.length === 0) {
-                    // 發完牌後如果還有沒消的，不直接結束
-                    let stillHasMoves = this.rows.some(r => this.getMatchMode(r));
-                    if (!stillHasMoves) this.endGame();
+            handleCardClick(rowIdx, cardIdx) {
+                // 如果已經選了別列的牌，清空它，只能選同一列
+                if (this.selectedIndices.length > 0 && this.selectedIndices[0].row !== rowIdx) {
+                    this.selectedIndices = [];
+                }
+
+                const existingIdx = this.selectedIndices.findIndex(s => s.idx === cardIdx);
+                if (existingIdx !== -1) {
+                    this.selectedIndices.splice(existingIdx, 1);
+                } else if (this.selectedIndices.length < 3) {
+                    this.selectedIndices.push({ row: rowIdx, idx: cardIdx });
+                }
+
+                if (this.selectedIndices.length === 3) {
+                    this.verifyMatch(rowIdx);
+                } else {
+                    this.render();
                 }
             },
 
-            handleRowClick(rowIndex) {
-                const row = this.rows[rowIndex];
-                const mode = this.getMatchMode(row);
+            verifyMatch(rowIdx) {
+                const row = this.rows[rowIdx];
+                const sum = this.selectedIndices.reduce((acc, curr) => acc + this.getVal(row[curr.idx].rank), 0);
 
-                if (mode) {
-                    if (mode === 'LAST3') {
-                        row.splice(row.length - 3, 3);
-                    } else if (mode === 'HEADTAIL') {
-                        row.splice(row.length - 1, 1);
-                        row.splice(0, HEADTAIL = 2);
-                    } else if (mode === 'TAILHEAD') {
-                        row.splice(row.length - 2, 2);
-                        row.splice(0, 1);
-                    }
-
-                    if (row.length === 0) this.locked[rowIndex] = true;
-                    this.render();
+                if ([9, 19, 29].includes(sum)) {
+                    // 正確：由大到小刪除索引
+                    const toDelete = this.selectedIndices.map(s => s.idx).sort((a, b) => b - a);
+                    toDelete.forEach(idx => row.splice(idx, 1));
                     
-                    // 消除後可能產生新組合，若沒了且沒牌則結束
-                    if (this.deck.length === 0) {
-                        if (!this.rows.some(r => this.getMatchMode(r))) this.endGame();
-                    }
+                    if (row.length === 0) this.locked[rowIdx] = true;
+                    this.selectedIndices = [];
+                    this.render();
+                    if (this.deck.length === 0 && this.hasAnyMatch() === -1) this.endGame();
+                } else {
+                    // 錯誤：觸發紅閃
+                    this.triggerError(rowIdx);
+                    this.selectedIndices = [];
+                    this.render();
                 }
+            },
+
+            triggerError(rowIdx) {
+                const el = document.getElementById(`row-${rowIdx}`);
+                el.classList.add('must-action');
+                setTimeout(() => el.classList.remove('must-action'), 800);
             },
 
             endGame() {
@@ -247,12 +267,7 @@
                 const resultDiv = document.getElementById('result');
                 resultDiv.style.display = 'block';
                 document.getElementById('next-btn').disabled = true;
-                
-                if (all.length <= 1) {
-                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">大成功！</h2><p>剩餘 ${all.length} 張牌</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">新局</button>`;
-                } else {
-                    resultDiv.innerHTML = `<h2 style="color:#ff4757">遊戲結束</h2><p>剩餘 ${all.length} 張牌</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">再試一次</button>`;
-                }
+                resultDiv.innerHTML = `<h2>遊戲結束</h2><p>剩餘牌數：${all.length}</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">重新開始</button>`;
             },
 
             render() {
@@ -267,6 +282,15 @@
                         const container = document.createElement('div');
                         container.className = 'card-container';
                         container.style.zIndex = index + 1;
+                        
+                        const isSelected = this.selectedIndices.some(s => s.row === i && s.idx === index);
+                        if (isSelected) container.classList.add('selected');
+
+                        container.onclick = (e) => {
+                            e.stopPropagation();
+                            this.handleCardClick(i, index);
+                        };
+
                         const img = document.createElement('img');
                         img.src = `${baseUrl}${card.rank}${card.suit}.svg`;
                         img.className = 'card-img';
