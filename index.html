@@ -5,13 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>撲克牌圖案展示 - xcards</title>
     <style>
-        :root {
-            --bg-color: #f4f7f9;
-            --card-bg: #ffffff;
-        }
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background-color: var(--bg-color);
+            font-family: -apple-system, sans-serif;
+            background-color: #f0f2f5;
             margin: 0;
             padding: 20px;
             text-align: center;
@@ -24,21 +20,20 @@
             margin: 0 auto;
         }
         .card-wrapper {
-            background: var(--card-bg);
-            border-radius: 10px;
-            padding: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .card-wrapper img {
             width: 100%;
             height: auto;
-            display: block;
         }
         .card-label {
             margin-top: 8px;
             font-size: 12px;
-            color: #555;
-            font-weight: 600;
+            color: #666;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -49,51 +44,48 @@
     <div id="gallery" class="deck-container"></div>
 
     <script>
-        // 修正後的 Base URL
         const baseUrl = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/face/";
-        
-        // 根據該 Repo 慣例：h=紅心, d=方塊, c=梅花, s=黑桃
-        const suits = ['h', 'd', 'c', 's'];
         const gallery = document.getElementById('gallery');
+
+        // 定義該 Repo 的命名規則
+        const suits = ['C', 'D', 'H', 'S']; // 梅花, 方塊, 紅心, 黑桃
+        const ranks = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+        // 對應顯示名稱
+        const suitNames = { 'C': '梅花', 'D': '方塊', 'H': '紅心', 'S': '黑桃' };
 
         function createCard(fileName, label) {
             const div = document.createElement('div');
             div.className = 'card-wrapper';
             div.innerHTML = `
-                <img src="${baseUrl}${fileName}.svg" alt="${label}" onerror="this.parentElement.style.display='none'">
+                <img src="${baseUrl}${fileName}.svg" alt="${label}" onerror="console.log('Failed: ${fileName}')">
                 <div class="card-label">${label}</div>
             `;
             return div;
         }
 
-        // 1. 生成 52 張標準牌
+        // 生成 52 張標準牌
         suits.forEach(suit => {
-            for (let i = 1; i <= 13; i++) {
-                // 關鍵修正：點數 1-9 前面需要補 0 (例如 h01, h02...)
-                const rankStr = i < 10 ? '0' + i : i.toString();
-                const fileName = `${suit}${rankStr}`;
-                
-                // 顯示用的標籤
-                const suitMap = {h:'H', d:'D', c:'C', s:'S'};
-                const rankMap = {1:'A', 11:'J', 12:'Q', 13:'K'};
-                const label = `${suitMap[suit]} ${rankMap[i] || i}`;
-                
+            ranks.forEach(rank => {
+                // 根據截圖，點數在前，花色大寫在後
+                const fileName = `${rank}${suit}`;
+                const label = `${suitNames[suit]} ${rank === '1' ? 'A' : rank}`;
                 gallery.appendChild(createCard(fileName, label));
-            }
+            });
         });
 
-        // 2. 加入鬼牌 (Joker) - 通常命名為 j1, j2 或 joker1, joker2
-        gallery.appendChild(createCard('j1', 'Joker 1'));
-        gallery.appendChild(createCard('j2', 'Joker 2'));
+        // 加入鬼牌 (根據該 Repo 可能的命名，通常是 JB 和 JR)
+        gallery.appendChild(createCard('JB', '黑鬼牌 (JB)'));
+        gallery.appendChild(createCard('JR', '紅鬼牌 (JR)'));
 
-        // 3. 加入卡片背面 (在不同目錄下)
-        const backImg = document.createElement('div');
-        backImg.className = 'card-wrapper';
-        backImg.innerHTML = `
+        // 加入卡片背面
+        const backDiv = document.createElement('div');
+        backDiv.className = 'card-wrapper';
+        backDiv.innerHTML = `
             <img src="https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/back/b1.svg" alt="Back">
-            <div class="card-label">Back</div>
+            <div class="card-label">背面 (b1)</div>
         `;
-        gallery.appendChild(backImg);
+        gallery.appendChild(backDiv);
 
     </script>
 </body>
