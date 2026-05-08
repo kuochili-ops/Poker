@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 - 手動點選版</title>
+    <title>撲克占卜 - 滾動優化版</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -17,15 +17,33 @@
             background-color: var(--bg-color);
             color: white;
             margin: 0;
-            padding: 10px;
+            padding: 0;
             display: flex;
             flex-direction: column;
-            align-items: center;
             height: 100vh;
-            overflow: hidden;
+            overflow: hidden; /* 防止全畫面滾動 */
+        }
+        
+        /* 固定標題區域 */
+        header {
+            padding: 10px;
+            text-align: center;
+            background: #1a1a1a;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         h1 { font-size: 1.2rem; margin: 5px 0; letter-spacing: 1px; }
-        .status { margin-bottom: 10px; color: #888; font-size: 0.85rem; }
+        .status { color: #888; font-size: 0.85rem; }
+
+        /* 可捲動的遊戲區域 */
+        .main-container {
+            flex: 1;
+            overflow-y: auto; /* 允許垂直滾動 */
+            -webkit-overflow-scrolling: touch;
+            padding: 10px 10px 180px 10px; /* 底部留白給功能鍵 */
+            display: flex;
+            justify-content: center;
+        }
 
         .board {
             display: grid;
@@ -33,7 +51,7 @@
             gap: 8px;
             width: 100%;
             max-width: 500px;
-            margin-bottom: 160px;
+            align-items: start;
         }
         .row {
             display: flex;
@@ -44,10 +62,9 @@
             border-radius: 8px;
             background: rgba(255,255,255,0.02);
             transition: all 0.2s;
-            position: relative;
+            padding-bottom: 20px;
         }
         
-        /* 錯誤提醒動畫 */
         @keyframes alert-red {
             0% { border-color: #333; }
             50% { border-color: var(--error-color); box-shadow: inset 0 0 20px var(--error-color); }
@@ -65,7 +82,6 @@
         }
         .card-container:first-child { margin-top: 12px; }
 
-        /* 被選中的牌反閃效果 */
         @keyframes card-glow {
             0% { filter: brightness(1); }
             50% { filter: brightness(1.5); transform: scale(1.05); }
@@ -89,18 +105,20 @@
             background: white; 
         }
 
+        /* 浮在最上層的功能鍵區域 */
         .controls-footer {
             position: fixed;
             bottom: 0;
             left: 0;
             width: 100%;
-            background: #1e1e1e;
+            background: rgba(30, 30, 30, 0.85);
+            backdrop-filter: blur(10px); /* 毛玻璃效果 */
             padding: 15px 0 calc(env(safe-area-inset-bottom) + 15px);
             display: flex;
             justify-content: center;
             gap: 15px;
             border-top: 1px solid #333;
-            z-index: 500;
+            z-index: 2000; /* 確保在所有牌之上 */
         }
         .btn {
             padding: 14px 28px;
@@ -109,6 +127,7 @@
             border: none;
             border-radius: 12px;
             cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         .btn-new { background: #444; color: #ccc; }
         .btn-draw { background: #d35400; color: white; flex-grow: 0.4; }
@@ -117,21 +136,25 @@
             position: fixed;
             top: 45%; left: 50%; transform: translate(-50%, -50%);
             background: #2c3e50; padding: 30px; border-radius: 20px;
-            text-align: center; z-index: 1000; width: 80%;
+            text-align: center; z-index: 3000; width: 80%;
             box-shadow: 0 20px 60px rgba(0,0,0,0.9); border: 3px solid var(--select-color);
         }
     </style>
 </head>
 <body>
 
-    <h1>撲克占卜 (點選判定版)</h1>
-    <div class="status" id="deck-count">剩餘牌數：40</div>
+    <header>
+        <h1>撲克占卜 (滾動與圖層優化)</h1>
+        <div class="status" id="deck-count">剩餘牌數：40</div>
+    </header>
 
-    <div class="board">
-        <div class="row" id="row-0"></div>
-        <div class="row" id="row-1"></div>
-        <div class="row" id="row-2"></div>
-        <div class="row" id="row-3"></div>
+    <div class="main-container">
+        <div class="board">
+            <div class="row" id="row-0"></div>
+            <div class="row" id="row-1"></div>
+            <div class="row" id="row-2"></div>
+            <div class="row" id="row-3"></div>
+        </div>
     </div>
 
     <div id="result" class="result-panel" style="display: none;"></div>
@@ -148,7 +171,7 @@
             deck: [],
             rows: [[], [], [], []],
             locked: [false, false, false, false],
-            selectedIndices: [], // 格式: {row, idx}
+            selectedIndices: [], 
             currentIndex: 0,
 
             init() {
@@ -174,16 +197,13 @@
                 return parseInt(rank);
             },
 
-            // 檢查全場是否有符合規則但未消除的組合 (用於翻牌前的提醒)
             hasAnyMatch() {
                 for(let i=0; i<4; i++) {
                     const r = this.rows[i];
                     if (r.length < 3) continue;
                     const v = r.map(c => this.getVal(c.rank));
                     const last = v.length - 1;
-                    
                     const check = (a, b, c) => [9, 19, 29].includes(a + b + c);
-                    
                     if (check(v[last], v[last-1], v[last-2]) || 
                         check(v[0], v[1], v[last]) || 
                         check(v[0], v[last], v[last-1])) return i;
@@ -216,7 +236,6 @@
             },
 
             handleCardClick(rowIdx, cardIdx) {
-                // 如果已經選了別列的牌，清空它，只能選同一列
                 if (this.selectedIndices.length > 0 && this.selectedIndices[0].row !== rowIdx) {
                     this.selectedIndices = [];
                 }
@@ -240,16 +259,13 @@
                 const sum = this.selectedIndices.reduce((acc, curr) => acc + this.getVal(row[curr.idx].rank), 0);
 
                 if ([9, 19, 29].includes(sum)) {
-                    // 正確：由大到小刪除索引
                     const toDelete = this.selectedIndices.map(s => s.idx).sort((a, b) => b - a);
                     toDelete.forEach(idx => row.splice(idx, 1));
-                    
                     if (row.length === 0) this.locked[rowIdx] = true;
                     this.selectedIndices = [];
                     this.render();
                     if (this.deck.length === 0 && this.hasAnyMatch() === -1) this.endGame();
                 } else {
-                    // 錯誤：觸發紅閃
                     this.triggerError(rowIdx);
                     this.selectedIndices = [];
                     this.render();
@@ -260,6 +276,10 @@
                 const el = document.getElementById(`row-${rowIdx}`);
                 el.classList.add('must-action');
                 setTimeout(() => el.classList.remove('must-action'), 800);
+                // 震動回饋 (如果手機支援)
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(200);
+                }
             },
 
             endGame() {
