@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 - 行鎖定版</title>
+    <title>撲克占卜 - 最終抽籤版</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -67,7 +67,6 @@
             position: relative;
         }
         
-        /* 封鎖狀態樣式 */
         .row.row-locked {
             border: 2px dashed #444;
             background: var(--locked-color);
@@ -78,8 +77,8 @@
             content: "LOCKED";
             position: absolute;
             top: 20px;
-            font-size: 0.7rem;
-            color: #666;
+            font-size: 0.6rem;
+            color: #555;
             letter-spacing: 2px;
         }
 
@@ -143,41 +142,42 @@
         .btn-new { background: #444; color: #ccc; }
         .btn-draw { background: #d35400; color: white; flex-grow: 0.4; }
 
+        /* 結果顯示面板 */
         .result-panel {
             position: fixed;
             top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(20, 30, 48, 0.98);
+            background: rgba(10, 20, 35, 0.98);
             padding: 40px 20px;
             border-radius: 24px;
             text-align: center;
             z-index: 3000;
             width: 85%;
-            box-shadow: 0 0 100px rgba(0,0,0,1);
+            box-shadow: 0 0 120px rgba(0,0,0,1);
             border: 2px solid var(--select-color);
             display: none;
-            animation: fadeIn 0.5s ease-out;
+            animation: cardReveal 0.6s cubic-bezier(0.23, 1, 0.32, 1);
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, -40%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+        @keyframes cardReveal { from { opacity: 0; transform: translate(-50%, -30%) scale(0.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 
         .final-card-display {
-            width: 180px;
+            width: 200px;
             margin: 20px auto;
         }
         .final-card-display img {
             width: 100%;
             border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            box-shadow: 0 0 50px rgba(241, 196, 15, 0.3);
             border: 2px solid white;
         }
 
-        .result-title { font-size: 1.5rem; color: var(--select-color); margin-bottom: 10px; }
+        .result-title { font-size: 1.6rem; color: var(--select-color); margin-bottom: 10px; font-weight: bold; }
         .result-desc { color: #fff; margin-bottom: 25px; line-height: 1.6; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>撲克占卜 (行消鎖定版)</h1>
+        <h1>撲克占卜 (終極抽籤版)</h1>
         <div class="status">待置放牌堆：<span id="deck-count">40</span></div>
     </header>
 
@@ -205,7 +205,7 @@
         const game = {
             deck: [],
             rows: [[], [], [], []],
-            isRowLocked: [false, false, false, false], // 紀錄哪些行被封鎖了
+            isRowLocked: [false, false, false, false],
             selectedIndices: [], 
             currentIndex: 0,
             isGameOver: false,
@@ -252,13 +252,6 @@
             drawNext() {
                 if (this.isGameOver) return;
 
-                // 檢查是否還有能發牌的地方
-                const openRows = this.isRowLocked.filter(l => !l).length;
-                if (openRows === 0) {
-                    this.checkEndGame();
-                    return;
-                }
-
                 const matchRow = this.hasAnyMatch();
                 if (matchRow !== -1) {
                     this.triggerError(matchRow);
@@ -270,7 +263,6 @@
                     return;
                 };
 
-                // 自動找到下一個未封鎖的行
                 let attempts = 0;
                 while (this.isRowLocked[this.currentIndex] && attempts < 4) {
                     this.currentIndex = (this.currentIndex + 1) % 4;
@@ -281,6 +273,9 @@
                     this.rows[this.currentIndex].push(this.deck.shift());
                     this.currentIndex = (this.currentIndex + 1) % 4;
                     this.render();
+                    this.checkEndGame();
+                } else {
+                    // 如果沒有任何開著的行可以放牌
                     this.checkEndGame();
                 }
             },
@@ -317,7 +312,6 @@
                     
                     this.deck.push(...matchedCards.reverse()); 
                     
-                    // 規則變動：如果行消空了，就封鎖它
                     if (row.length === 0) {
                         this.isRowLocked[rowIdx] = true;
                     }
@@ -342,43 +336,43 @@
                 const allOnBoard = this.rows.flat();
                 const openRows = this.isRowLocked.filter(l => !l).length;
 
-                // 終局條件：
-                // 1. 全部行都消掉 (大成功)
-                // 2. 只剩一張且無法再發 (成功)
-                // 3. 牌堆空了且無法再消 (失敗)
-                if (openRows === 0 || (this.deck.length === 0 && allOnBoard.length === 1)) {
+                // 核心邏輯：全消後再放一張 (即抽出籤詩)
+                if (openRows === 0 && this.deck.length > 0) {
                     this.isGameOver = true;
-                    this.showFinalResult(allOnBoard[0] || null);
-                } else if (this.deck.length === 0 && this.hasAnyMatch() === -1) {
+                    const lottery = this.deck.shift(); // 抽出牌堆第一張作為占卜牌
+                    this.showFinalResult(lottery, "占卜抽籤");
+                } 
+                // 或者是原本就只剩一張
+                else if (openRows === 1 && allOnBoard.length === 1 && this.deck.length === 0) {
+                    this.isGameOver = true;
+                    this.showFinalResult(allOnBoard[0], "最終結果");
+                }
+                // 牌堆空了且沒得消了
+                else if (this.deck.length === 0 && this.hasAnyMatch() === -1) {
                     this.isGameOver = true;
                     this.showFinalResult(null, allOnBoard.length);
                 }
             },
 
-            showFinalResult(lastCard, count = 0) {
+            showFinalResult(lastCard, type = "") {
                 const resultDiv = document.getElementById('result');
                 const resultContent = document.getElementById('result-content');
                 document.getElementById('next-btn').disabled = true;
                 
                 if (lastCard) {
+                    const title = type === "占卜抽籤" ? "全清達成！抽籤結果" : "占卜結果";
                     resultContent.innerHTML = `
-                        <div class="result-title">占卜大成功</div>
-                        <div class="result-desc">最後僅剩這張牌：</div>
+                        <div class="result-title">${title}</div>
+                        <div class="result-desc">這張牌代表你目前的契機：</div>
                         <div class="final-card-display">
                             <img src="${baseUrl}${lastCard.rank}${lastCard.suit}.svg">
                         </div>
                         <button class="btn btn-draw" style="width:100%; margin-top:20px;" onclick="game.init()">重新開始</button>
                     `;
-                } else if (count === 0) {
-                    resultContent.innerHTML = `
-                        <div class="result-title" style="color:var(--success-color)">完美全清！</div>
-                        <div class="result-desc">你成功清空了所有牌行。</div>
-                        <button class="btn btn-draw" style="width:100%" onclick="game.init()">重新開始</button>
-                    `;
                 } else {
                     resultContent.innerHTML = `
                         <div class="result-title" style="color:#ff4757">遊戲結束</div>
-                        <div class="result-desc">無法再進行任何動作。<br>剩餘牌數：${count} 張</div>
+                        <div class="result-desc">盤面剩餘牌數：${arguments[1]} 張<br>未能達成全清抽籤。</div>
                         <button class="btn btn-draw" style="width:100%" onclick="game.init()">重新挑戰</button>
                     `;
                 }
@@ -391,11 +385,8 @@
                     const rowEl = document.getElementById(`row-${i}`);
                     rowEl.innerHTML = '';
                     
-                    if (this.isRowLocked[i]) {
-                        rowEl.classList.add('row-locked');
-                    } else {
-                        rowEl.classList.remove('row-locked');
-                    }
+                    if (this.isRowLocked[i]) rowEl.classList.add('row-locked');
+                    else rowEl.classList.remove('row-locked');
 
                     this.rows[i].forEach((card, index) => {
                         const container = document.createElement('div');
