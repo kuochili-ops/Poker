@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 9/19/29 - 疊加修正版</title>
+    <title>撲克占卜 9/19/29 - 視覺強化版</title>
     <style>
         :root {
             --bg-color: #121212;
             --card-width: 82px;
-            /* 負值越大，蓋得越多；這裡調小一點，確保前牌露出頭部 */
-            --overlap-height: -100px; 
+            /* 調整此數值：負值越小（如 -70），前一張牌露出的部分就越多 */
+            --overlap-height: -82px; 
             --highlight-color: #f1c40f;
             --error-color: #ff4757;
         }
@@ -23,7 +23,7 @@
             flex-direction: column;
             align-items: center;
             height: 100vh;
-            overflow: hidden;
+            overflow-x: hidden;
         }
         h1 { font-size: 1.3rem; margin: 5px 0; letter-spacing: 2px; }
         .status { margin-bottom: 10px; color: #888; font-size: 0.85rem; }
@@ -34,13 +34,13 @@
             gap: 8px;
             width: 100%;
             max-width: 500px;
-            margin-bottom: 140px;
+            margin-bottom: 160px; /* 為底部預留更多空間 */
         }
         .row {
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 500px;
+            min-height: 520px;
             border: 1px solid #333;
             border-radius: 8px;
             background: rgba(255,255,255,0.02);
@@ -61,35 +61,34 @@
         }
         .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; z-index: 100; }
         .row.must-action { animation: alert-red 0.3s infinite; border-color: var(--error-color) !important; z-index: 200; }
-        .row.locked { opacity: 0.2; pointer-events: none; background: #000; }
+        .row.locked { opacity: 0.2; pointer-events: none; background: #000; border-style: dashed; }
 
         .card-container {
             width: var(--card-width);
             position: relative;
-            /* 讓後一張蓋在前一張上面 */
             margin-top: var(--overlap-height);
         }
-        /* 第一張牌不需要向上偏移 */
         .card-container:first-child {
-            margin-top: 10px;
+            margin-top: 12px; /* 第一張牌頂部留白 */
         }
 
         .card-img {
             width: 100%;
             height: auto;
-            border-radius: 5px;
+            border-radius: 6px;
             display: block;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.5); /* 陰影向上，增加堆疊感 */
-            background: white; /* 避免 SVG 透明度問題 */
+            box-shadow: 0 -3px 12px rgba(0,0,0,0.6); 
+            background: white; 
         }
         
-        /* 標示要消除的目標 */
+        /* 消除目標的高亮樣式 */
         .card-container.target-elimination img {
-            outline: 3px solid var(--highlight-color);
-            outline-offset: -3px;
-            filter: brightness(1.1);
+            outline: 4px solid var(--highlight-color);
+            outline-offset: -4px;
+            filter: brightness(1.15) contrast(1.1);
         }
 
+        /* 底部控制欄固定 */
         .controls-footer {
             position: fixed;
             bottom: 0;
@@ -110,23 +109,26 @@
             border: none;
             border-radius: 12px;
             cursor: pointer;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
         }
         .btn-new { background: #444; color: #ccc; }
         .btn-draw { background: #d35400; color: white; flex-grow: 0.4; }
+        .btn:active { transform: translateY(2px); box-shadow: none; }
 
+        /* 結果面板 */
         .result-panel {
             position: fixed;
             top: 45%; left: 50%; transform: translate(-50%, -50%);
             background: #2c3e50; padding: 30px; border-radius: 20px;
-            text-align: center; z-index: 1000; width: 75%;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.9); border: 3px solid #f1c40f;
+            text-align: center; z-index: 1000; width: 80%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.9); border: 3px solid #f1c40f;
         }
     </style>
 </head>
 <body>
 
     <h1>撲克占卜 9 / 19 / 29</h1>
-    <div class="status" id="deck-count">剩餘：52</div>
+    <div class="status" id="deck-count">剩餘牌數：52</div>
 
     <div class="board">
         <div class="row" id="row-0" onclick="game.handleRowClick(0)"></div>
@@ -138,7 +140,7 @@
     <div id="result" class="result-panel" style="display: none;"></div>
 
     <div class="controls-footer">
-        <button class="btn btn-new" onclick="game.init()">新遊戲</button>
+        <button class="btn btn-new" onclick="game.init()">重新洗牌</button>
         <button class="btn btn-draw" id="next-btn" onclick="game.drawNext()">翻下一張</button>
     </div>
 
@@ -234,14 +236,15 @@
                 document.getElementById('next-btn').disabled = true;
                 if (remaining.length === 1) {
                     const final = remaining[0];
-                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">運勢：${final.rank}${final.suit}</h2><button class="btn btn-draw" style="width:100%" onclick="game.init()">重新開始</button>`;
+                    const luckMap = { 'S': '沉穩', 'H': '大吉', 'D': '財運', 'C': '順利' };
+                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">占卜結果：${luckMap[final.suit]}</h2><p>剩餘：${final.rank}${final.suit}</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">再試一次</button>`;
                 } else {
-                    resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>剩 ${remaining.length} 張</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">再試一次</button>`;
+                    resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>還剩下 ${remaining.length} 張牌</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">重新挑戰</button>`;
                 }
             },
 
             render() {
-                document.getElementById('deck-count').innerText = `剩餘：${this.deck.length}`;
+                document.getElementById('deck-count').innerText = `剩餘牌數：${this.deck.length}`;
                 for (let i = 0; i < 4; i++) {
                     const rowEl = document.getElementById(`row-${i}`);
                     rowEl.innerHTML = '';
@@ -249,14 +252,13 @@
                     if (this.locked[i]) rowEl.classList.add('locked');
                     if (this.pendingMatch === i) rowEl.classList.add('can-match');
 
-                    this.rows[i].forEach((card, index) => {
+                    const currentRow = this.rows[i];
+                    currentRow.forEach((card, index) => {
                         const container = document.createElement('div');
                         container.className = 'card-container';
-                        
-                        // 正確層級：越後面的牌 z-index 越高，蓋住前面的牌
-                        container.style.zIndex = index + 1;
+                        container.style.zIndex = index + 1; // 越後面的牌越在上層
 
-                        if (this.pendingMatch === i && (index === 0 || index === 1 || index === this.rows[i].length - 1)) {
+                        if (this.pendingMatch === i && (index === 0 || index === 1 || index === currentRow.length - 1)) {
                             container.classList.add('target-elimination');
                         }
 
