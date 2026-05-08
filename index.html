@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 - 最終抽籤版</title>
+    <title>𓃥 白六 9/19/29 占卜撲克</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -12,10 +12,9 @@
             --error-color: #ff4757;
             --select-color: #f1c40f;
             --success-color: #2ecc71;
-            --locked-color: rgba(255, 255, 255, 0.05);
         }
         body {
-            font-family: -apple-system, sans-serif;
+            font-family: -apple-system, "Microsoft JhengHei", sans-serif;
             background-color: var(--bg-color);
             color: white;
             margin: 0;
@@ -33,7 +32,7 @@
             z-index: 1000;
             box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
-        h1 { font-size: 1.1rem; margin: 5px 0; letter-spacing: 1px; color: #ccc; }
+        h1 { font-size: 1.1rem; margin: 5px 0; letter-spacing: 1px; color: #f1c40f; }
         .status { color: #888; font-size: 0.85rem; }
         .status span { color: var(--success-color); font-weight: bold; }
 
@@ -54,32 +53,27 @@
             max-width: 500px;
             align-items: start;
         }
+        
+        /* 避免跳動：固定容器最小高度並優化渲染層級 */
         .row {
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 520px;
+            min-height: 600px; /* 增加保險高度 */
             border: 1px solid #333;
             border-radius: 8px;
             background: rgba(255,255,255,0.02);
-            transition: all 0.3s;
+            transition: background 0.3s, border 0.3s;
             padding-bottom: 20px;
             position: relative;
+            contain: layout; /* 限制重繪範圍，減少跳動 */
         }
         
         .row.row-locked {
             border: 2px dashed #444;
-            background: var(--locked-color);
+            background: rgba(255, 255, 255, 0.05);
             opacity: 0.4;
             pointer-events: none;
-        }
-        .row.row-locked::after {
-            content: "LOCKED";
-            position: absolute;
-            top: 20px;
-            font-size: 0.6rem;
-            color: #555;
-            letter-spacing: 2px;
         }
 
         @keyframes alert-red {
@@ -87,26 +81,25 @@
             50% { border-color: var(--error-color); box-shadow: inset 0 0 20px var(--error-color); }
             100% { border-color: #333; }
         }
-        .row.must-action { animation: alert-red 0.3s 2; z-index: 200; }
+        .row.must-action { animation: alert-red 0.3s 2; }
 
         .card-container {
             width: var(--card-width);
+            height: 118px; /* 固定高度減少重排計算 */
             position: relative;
             margin-top: var(--overlap-height);
-            transition: transform 0.2s;
             cursor: pointer;
+            will-change: transform;
         }
         .card-container:first-child { margin-top: 12px; }
 
-        .card-container.selected {
-            z-index: 100 !important;
-            filter: brightness(1.2);
-            transform: scale(1.05);
-        }
+        /* 選中狀態：不改變實體寬高避免擠壓 */
         .card-container.selected img {
             outline: 4px solid var(--select-color);
             outline-offset: -4px;
             box-shadow: 0 0 15px var(--select-color);
+            transform: translateY(-5px); /* 往上飄一點但不影響排版 */
+            z-index: 100;
         }
 
         .card-img {
@@ -114,7 +107,8 @@
             height: auto;
             border-radius: 6px;
             display: block;
-            background: white; 
+            background: #fff;
+            transition: transform 0.2s;
         }
 
         .controls-footer {
@@ -142,7 +136,6 @@
         .btn-new { background: #444; color: #ccc; }
         .btn-draw { background: #d35400; color: white; flex-grow: 0.4; }
 
-        /* 結果顯示面板 */
         .result-panel {
             position: fixed;
             top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -155,29 +148,22 @@
             box-shadow: 0 0 120px rgba(0,0,0,1);
             border: 2px solid var(--select-color);
             display: none;
-            animation: cardReveal 0.6s cubic-bezier(0.23, 1, 0.32, 1);
         }
-        @keyframes cardReveal { from { opacity: 0; transform: translate(-50%, -30%) scale(0.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 
-        .final-card-display {
-            width: 200px;
-            margin: 20px auto;
-        }
         .final-card-display img {
-            width: 100%;
+            width: 200px;
             border-radius: 12px;
-            box-shadow: 0 0 50px rgba(241, 196, 15, 0.3);
+            box-shadow: 0 0 50px rgba(241, 196, 15, 0.4);
             border: 2px solid white;
+            animation: cardReveal 0.5s ease-out;
         }
-
-        .result-title { font-size: 1.6rem; color: var(--select-color); margin-bottom: 10px; font-weight: bold; }
-        .result-desc { color: #fff; margin-bottom: 25px; line-height: 1.6; }
+        @keyframes cardReveal { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>撲克占卜 (終極抽籤版)</h1>
+        <h1>𓃥 白六 9/19/29 占卜撲克</h1>
         <div class="status">待置放牌堆：<span id="deck-count">40</span></div>
     </header>
 
@@ -251,49 +237,41 @@
 
             drawNext() {
                 if (this.isGameOver) return;
-
                 const matchRow = this.hasAnyMatch();
                 if (matchRow !== -1) {
                     this.triggerError(matchRow);
                     return;
                 }
-
                 if (this.deck.length === 0) {
                     this.checkEndGame();
                     return;
-                };
-
+                }
                 let attempts = 0;
                 while (this.isRowLocked[this.currentIndex] && attempts < 4) {
                     this.currentIndex = (this.currentIndex + 1) % 4;
                     attempts++;
                 }
-
                 if (attempts < 4) {
                     this.rows[this.currentIndex].push(this.deck.shift());
                     this.currentIndex = (this.currentIndex + 1) % 4;
                     this.render();
                     this.checkEndGame();
                 } else {
-                    // 如果沒有任何開著的行可以放牌
                     this.checkEndGame();
                 }
             },
 
             handleCardClick(rowIdx, cardIdx) {
                 if (this.isGameOver || this.isRowLocked[rowIdx]) return;
-                
                 if (this.selectedIndices.length > 0 && this.selectedIndices[0].row !== rowIdx) {
                     this.selectedIndices = [];
                 }
-
                 const existingIdx = this.selectedIndices.findIndex(s => s.idx === cardIdx);
                 if (existingIdx !== -1) {
                     this.selectedIndices.splice(existingIdx, 1);
                 } else if (this.selectedIndices.length < 3) {
                     this.selectedIndices.push({ row: rowIdx, idx: cardIdx });
                 }
-
                 if (this.selectedIndices.length === 3) {
                     this.verifyMatch(rowIdx);
                 } else {
@@ -304,18 +282,12 @@
             verifyMatch(rowIdx) {
                 const row = this.rows[rowIdx];
                 const sum = this.selectedIndices.reduce((acc, curr) => acc + this.getVal(row[curr.idx].rank), 0);
-
                 if ([9, 19, 29].includes(sum)) {
                     const indices = this.selectedIndices.map(s => s.idx).sort((a, b) => b - a);
                     const matchedCards = [];
                     indices.forEach(idx => matchedCards.push(row.splice(idx, 1)[0]));
-                    
                     this.deck.push(...matchedCards.reverse()); 
-                    
-                    if (row.length === 0) {
-                        this.isRowLocked[rowIdx] = true;
-                    }
-
+                    if (row.length === 0) this.isRowLocked[rowIdx] = true;
                     this.selectedIndices = [];
                     this.render();
                     this.checkEndGame();
@@ -335,32 +307,23 @@
             checkEndGame() {
                 const allOnBoard = this.rows.flat();
                 const openRows = this.isRowLocked.filter(l => !l).length;
-
-                // 核心邏輯：全消後再放一張 (即抽出籤詩)
                 if (openRows === 0 && this.deck.length > 0) {
                     this.isGameOver = true;
-                    const lottery = this.deck.shift(); // 抽出牌堆第一張作為占卜牌
-                    this.showFinalResult(lottery, "占卜抽籤");
-                } 
-                // 或者是原本就只剩一張
-                else if (openRows === 1 && allOnBoard.length === 1 && this.deck.length === 0) {
+                    this.showFinalResult(this.deck.shift(), "全消達成！抽籤結果");
+                } else if (openRows === 1 && allOnBoard.length === 1 && this.deck.length === 0) {
                     this.isGameOver = true;
                     this.showFinalResult(allOnBoard[0], "最終結果");
-                }
-                // 牌堆空了且沒得消了
-                else if (this.deck.length === 0 && this.hasAnyMatch() === -1) {
+                } else if (this.deck.length === 0 && this.hasAnyMatch() === -1) {
                     this.isGameOver = true;
                     this.showFinalResult(null, allOnBoard.length);
                 }
             },
 
-            showFinalResult(lastCard, type = "") {
+            showFinalResult(lastCard, title = "") {
                 const resultDiv = document.getElementById('result');
                 const resultContent = document.getElementById('result-content');
                 document.getElementById('next-btn').disabled = true;
-                
                 if (lastCard) {
-                    const title = type === "占卜抽籤" ? "全清達成！抽籤結果" : "占卜結果";
                     resultContent.innerHTML = `
                         <div class="result-title">${title}</div>
                         <div class="result-desc">這張牌代表你目前的契機：</div>
@@ -372,7 +335,7 @@
                 } else {
                     resultContent.innerHTML = `
                         <div class="result-title" style="color:#ff4757">遊戲結束</div>
-                        <div class="result-desc">盤面剩餘牌數：${arguments[1]} 張<br>未能達成全清抽籤。</div>
+                        <div class="result-desc">未達成全清，剩餘牌數：${arguments[1]} 張</div>
                         <button class="btn btn-draw" style="width:100%" onclick="game.init()">重新挑戰</button>
                     `;
                 }
@@ -381,14 +344,15 @@
 
             render() {
                 document.getElementById('deck-count').innerText = this.deck.length;
-                for (let i = 0; i < 4; i++) {
+                this.rows.forEach((rowData, i) => {
                     const rowEl = document.getElementById(`row-${i}`);
-                    rowEl.innerHTML = '';
+                    // 使用 DocumentFragment 減少 DOM 操作造成的跳動
+                    const fragment = document.createDocumentFragment();
                     
                     if (this.isRowLocked[i]) rowEl.classList.add('row-locked');
                     else rowEl.classList.remove('row-locked');
 
-                    this.rows[i].forEach((card, index) => {
+                    rowData.forEach((card, index) => {
                         const container = document.createElement('div');
                         container.className = 'card-container';
                         container.style.zIndex = index + 1;
@@ -396,18 +360,20 @@
                         const isSelected = this.selectedIndices.some(s => s.row === i && s.idx === index);
                         if (isSelected) container.classList.add('selected');
 
-                        container.onclick = (e) => {
-                            e.stopPropagation();
-                            this.handleCardClick(i, index);
-                        };
+                        container.onclick = (e) => { e.stopPropagation(); this.handleCardClick(i, index); };
 
                         const img = document.createElement('img');
                         img.src = `${baseUrl}${card.rank}${card.suit}.svg`;
                         img.className = 'card-img';
+                        img.loading = "eager"; // 強制優先載入
+                        
                         container.appendChild(img);
-                        rowEl.appendChild(container);
+                        fragment.appendChild(container);
                     });
-                }
+                    
+                    rowEl.innerHTML = '';
+                    rowEl.appendChild(fragment);
+                });
             }
         };
         game.init();
