@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>撲克占卜 9/19/29 - 三張修正版</title>
+    <title>撲克占卜 9/19/29 - 精確消除版</title>
     <style>
         :root {
             --bg-color: #121212;
             --card-width: 82px;
-            --overlap-height: -105px; /* 露出的空間 */
+            --overlap-height: -105px; 
             --highlight-color: #f1c40f;
             --error-color: #ff4757;
         }
@@ -39,12 +39,13 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 450px;
+            min-height: 480px;
             border: 1px solid #333;
             border-radius: 8px;
             background: rgba(255,255,255,0.02);
             transition: all 0.2s;
             cursor: pointer;
+            position: relative;
         }
         
         @keyframes breathe {
@@ -57,15 +58,22 @@
             50% { background: rgba(255, 71, 87, 0.5); }
             100% { background: transparent; }
         }
-        .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; }
+        .row.can-match { animation: breathe 1.2s infinite; border-width: 2px; z-index: 10; }
         .row.must-action { animation: alert-red 0.3s infinite; border-color: var(--error-color) !important; z-index: 50; }
-        .row.locked { opacity: 0.2; pointer-events: none; background: #000; }
+        .row.locked { opacity: 0.2; pointer-events: none; background: #000; border-style: dashed; }
 
-        .card-container { width: var(--card-width); position: relative; transition: transform 0.2s; }
+        .card-container { width: var(--card-width); position: relative; transition: all 0.3s ease; }
         .card-img { width: 100%; height: auto; border-radius: 5px; display: block; box-shadow: 0 3px 8px rgba(0,0,0,0.6); }
         .card-container:not(:first-child) { margin-top: var(--overlap-height); }
 
-        /* 底部控制欄 */
+        /* 標示即將消除的牌（視覺回饋） */
+        .row.can-match .card-container:first-child,
+        .row.can-match .card-container:nth-child(2),
+        .row.can-match .card-container:last-child {
+            filter: brightness(1.2) contrast(1.1);
+            transform: translateY(-5px);
+        }
+
         .controls-footer {
             position: fixed;
             bottom: 0;
@@ -89,7 +97,6 @@
         }
         .btn-new { background: #444; color: #ccc; }
         .btn-draw { background: #d35400; color: white; flex-grow: 0.4; }
-        .btn:disabled { background: #222; color: #555; }
 
         .result-panel {
             position: fixed;
@@ -153,6 +160,7 @@
             },
 
             drawNext() {
+                // 如果目前有排可以消除，強制先點擊消除
                 if (this.pendingMatch !== -1) {
                     const el = document.getElementById(`row-${this.pendingMatch}`);
                     el.classList.add('must-action');
@@ -173,7 +181,7 @@
                 const card = this.deck.shift();
                 this.rows[this.currentIndex].push(card);
                 
-                // 檢查規則：頭兩張 + 最後一張
+                // 檢查規則：第 1 張 + 第 2 張 + 最後一張
                 this.checkStatus(this.currentIndex);
                 
                 this.currentIndex = (this.currentIndex + 1) % 4;
@@ -184,14 +192,11 @@
 
             checkStatus(rowIndex) {
                 const row = this.rows[rowIndex];
-                // 必須至少有三張牌才能觸發消除 (最前兩張 + 最後一張)
                 if (row.length < 3) return;
 
-                const firstVal = this.getVal(row[0].rank);
-                const secondVal = this.getVal(row[1].rank);
-                const lastVal = this.getVal(row[row.length - 1].rank);
-                
-                const sum = firstVal + secondVal + lastVal;
+                const sum = this.getVal(row[0].rank) + 
+                            this.getVal(row[1].rank) + 
+                            this.getVal(row[row.length - 1].rank);
 
                 if ([9, 19, 29].includes(sum)) {
                     this.pendingMatch = rowIndex;
@@ -203,23 +208,30 @@
             handleRowClick(rowIndex) {
                 if (this.pendingMatch === rowIndex) {
                     const row = this.rows[rowIndex];
-                    // 消除最前面兩張與最後一張
+                    
+                    // 執行精確消除：只刪除第 1, 2 張和最後一張
+                    // 注意：刪除順序要從後面開始，避免 index 跑掉
                     row.splice(row.length - 1, 1); // 刪除最後一張
                     row.splice(0, 2);              // 刪除前兩張
                     
-                    if (row.length === 0) this.locked[rowIndex] = true;
-                    this.pendingMatch = -1;
-                    this.render();
+                    // 檢查是否因為消除而導致該排空了
+                    if (row.length === 0) {
+                        this.locked[rowIndex] = true;
+                    }
                     
-                    if (this.deck.length === 0) this.endGame();
+                    this.pendingMatch = -1;
+                    
+                    // 消除後可能中間留下來的牌又符合消除規則，所以要再檢查一次
+                    this.checkStatus(rowIndex);
+                    
+                    this.render();
+                    if (this.deck.length === 0 && this.pendingMatch === -1) this.endGame();
                 }
             },
 
             endGame() {
                 const all = this.rows.flat();
-                if (this.deck.length === 0 && this.pendingMatch === -1) {
-                    this.showResult(all);
-                }
+                this.showResult(all);
             },
 
             showResult(remaining) {
@@ -229,10 +241,10 @@
 
                 if (remaining.length === 1) {
                     const final = remaining[0];
-                    const luckMap = { 'S': '沉穩', 'H': '熱情', 'D': '豐盛', 'C': '踏實' };
-                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">今日運勢：${luckMap[final.suit]}</h2><p>最後一張牌是 ${final.rank}${final.suit}</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">再占一次</button>`;
+                    const luckMap = { 'S': '【黑桃】沉穩應對', 'H': '【紅心】幸運降臨', 'D': '【方塊】財運亨通', 'C': '【梅花】步步為營' };
+                    resultDiv.innerHTML = `<h2 style="color:#f1c40f">占卜結果</h2><p style="font-size:1.2rem">${luckMap[final.suit]}</p><button class="btn btn-draw" style="width:100%;margin-top:15px" onclick="game.init()">重新開始</button>`;
                 } else {
-                    resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>剩餘 ${remaining.length} 張牌，建議多休息。</p><button class="btn btn-draw" style="width:100%" onclick="game.init()">重新挑戰</button>`;
+                    resultDiv.innerHTML = `<h2 style="color:#ff4757">運氣爆炸</h2><p>剩餘 ${remaining.length} 張牌，尚未清空。</p><button class="btn btn-draw" style="width:100%;margin-top:15px" onclick="game.init()">再次挑戰</button>`;
                 }
             },
 
