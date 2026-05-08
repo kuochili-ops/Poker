@@ -3,88 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XCards 展示 - 最終修正版</title>
+    <title>XCards SVG 展示庫</title>
     <style>
+        :root {
+            --bg-color: #e9ecef;
+            --card-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
         body {
-            font-family: -apple-system, system-ui, sans-serif;
-            background-color: #f8f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
             margin: 0;
-            padding: 20px;
+            padding: 40px 20px;
             text-align: center;
         }
+        h1 { color: #2c3e50; margin-bottom: 40px; font-weight: 300; }
+        
         .deck-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 15px;
-            max-width: 1200px;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 20px;
+            max-width: 1300px;
             margin: 0 auto;
         }
         .card-wrapper {
             background: white;
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .card-wrapper:hover {
+            transform: scale(1.08);
+            z-index: 10;
         }
         .card-wrapper img {
             width: 100%;
             height: auto;
             display: block;
+            border-radius: 4px;
         }
         .card-label {
-            margin-top: 8px;
-            font-size: 13px;
-            color: #444;
-            font-weight: bold;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #555;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
     </style>
 </head>
 <body>
 
-    <h1>XCards SVG 庫展示</h1>
+    <h1>XCards SVG 展示</h1>
 
     <div id="gallery" class="deck-container"></div>
 
     <script>
-        const baseUrl = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/face/";
+        const rawBase = "https://raw.githubusercontent.com/kuochili-ops/xcards/master/svg/";
         const gallery = document.getElementById('gallery');
 
-        // 花色：C=Clubs, D=Diamonds, H=Hearts, S=Spades
-        const suits = ['C', 'D', 'H', 'S'];
-        // 點數：1=A, 10=T, 以及 J, Q, K
+        // 定義規則
+        const suits = ['C', 'D', 'H', 'S']; // 梅花, 方塊, 紅心, 黑桃
         const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K'];
 
-        const suitNames = { 'C': '梅花', 'D': '方塊', 'H': '紅心', 'S': '黑桃' };
+        const suitNames = { 'C': '♣', 'D': '♦', 'H': '♥', 'S': '♠' };
 
-        function createCard(fileName, label) {
+        function addCardToGallery(path, label) {
             const div = document.createElement('div');
             div.className = 'card-wrapper';
             div.innerHTML = `
-                <img src="${baseUrl}${fileName}.svg" alt="${label}" onerror="this.parentElement.style.display='none'">
+                <img src="${rawBase}${path}" alt="${label}" onerror="this.parentElement.style.display='none'">
                 <div class="card-label">${label}</div>
             `;
-            return div;
+            gallery.appendChild(div);
         }
 
-        // 遍歷生成 52 張牌
+        // 1. 先加入背面 (依據需求使用 bicycle_blue.svg)
+        addCardToGallery('back/bicycle_blue.svg', 'BICYCLE BLUE');
+
+        // 2. 生成 52 張標準牌
         suits.forEach(suit => {
             ranks.forEach(rank => {
-                // 格式：點數+花色 (例如 AC.svg, TC.svg, 2C.svg)
-                const fileName = `${rank}${suit}`;
-                const label = `${suitNames[suit]} ${rank.replace('T', '10')}`;
-                gallery.appendChild(createCard(fileName, label));
+                // 檔名：點數+花色 (例如 AS.svg, TS.svg, 2C.svg)
+                const fileName = `face/${rank}${suit}.svg`;
+                const displayRank = rank.replace('T', '10');
+                const label = `${suitNames[suit]}${displayRank}`;
+                addCardToGallery(fileName, label);
             });
         });
 
-        // 額外加入鬼牌與背面
-        gallery.appendChild(createCard('JB', '黑小丑 (JB)'));
-        gallery.appendChild(createCard('JR', '紅小丑 (JR)'));
-        
-        // 背面圖片
-        const backImg = createCard('../back/b1', '背面 (B1)');
-        // 移除 onerror 隱藏邏輯，因為背面在不同目錄
-        backImg.querySelector('img').onerror = null; 
-        gallery.appendChild(backImg);
+        // 3. 加入鬼牌 (Joker)
+        addCardToGallery('face/JB.svg', 'BLACK JOKER');
+        addCardToGallery('face/JR.svg', 'RED JOKER');
 
     </script>
 </body>
