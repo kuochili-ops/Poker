@@ -3,27 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>𓃥 白六占卜：疏失提醒版</title>
+    <title>𓃥 白六占卜：牌背修正版</title>
     <style>
         :root {
             --bg-color: #121212;
             --card-width: 82px;
             --overlap-height: -85px; 
-            --select-color: #f1c40f; /* 選取提醒色 */
-            --error-color: #ff4757;  /* 疏失提醒色 */
-            --back-path: url('svg/back/white6back.svg');
+            --select-color: #f1c40f;
+            --error-color: #ff4757;
+            /* 確保路徑正確，若在本地執行請確認資料夾結構 */
+            --back-url: url('svg/back/white6back.svg');
         }
         body {
             font-family: -apple-system, "Microsoft JhengHei", sans-serif;
             background-color: var(--bg-color); color: white; margin: 0; 
             display: flex; flex-direction: column; height: 100vh; overflow: hidden;
         }
-        header { padding: 10px; text-align: center; background: #1a1a1a; }
+        header { padding: 10px; text-align: center; background: #1a1a1a; border-bottom: 1px solid #333; }
         .status { color: #888; font-size: 0.85rem; }
         .main-container { flex: 1; overflow-y: auto; padding: 10px 10px 180px 10px; display: flex; justify-content: center; }
         .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 500px; }
         
-        /* 錯誤提醒動畫 */
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             25% { transform: translateX(-5px); }
@@ -47,15 +47,37 @@
         .btn { padding: 14px 28px; font-size: 16px; font-weight: 800; border: none; border-radius: 12px; cursor: pointer; }
         .btn-draw { background: #d35400; color: white; }
         
-        /* 翻牌占卜彈窗 */
-        .result-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 3000; }
-        .reveal-stage { perspective: 1000px; text-align: center; }
-        .flip-card { width: 240px; height: 345px; position: relative; transform-style: preserve-3d; transition: transform 0.8s; cursor: pointer; margin: 20px auto; }
+        /* 翻牌占卜彈窗樣式 */
+        .result-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: none; justify-content: center; align-items: center; z-index: 3000; }
+        .reveal-stage { perspective: 1000px; text-align: center; width: 100%; }
+        
+        .flip-card { 
+            width: 240px; height: 345px; position: relative; 
+            transform-style: preserve-3d; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); 
+            cursor: pointer; margin: 20px auto; 
+        }
         .flip-card.is-flipped { transform: rotateY(180deg); }
-        .flip-front, .flip-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 15px; overflow: hidden; }
+        
+        .flip-front, .flip-back { 
+            position: absolute; width: 100%; height: 100%; 
+            backface-visibility: hidden; border-radius: 15px; overflow: hidden; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        /* 這裡強制載入白六牌背 */
+        .flip-front { 
+            background-color: #222;
+            background-image: var(--back-url);
+            background-size: cover;
+            background-position: center;
+            border: 2px solid #444;
+        }
+        
         .flip-back { transform: rotateY(180deg); background: white; }
-        .flip-front { background: var(--back-path) center/cover; border: 2px solid #555; }
+        .flip-back img { width: 100%; height: 100%; display: block; }
+
         .hint-text { color: var(--select-color); margin-top: 15px; font-weight: bold; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
@@ -69,12 +91,14 @@
 
     <div id="result-overlay" class="result-overlay">
         <div class="reveal-stage">
-            <h2 id="result-title"></h2>
+            <h2 id="result-title" style="color: white; margin-bottom: 10px;"></h2>
             <div id="flip-card" class="flip-card" onclick="game.flipResult()">
+                <!-- 正面看得到的背面圖層 -->
                 <div class="flip-front"></div>
+                <!-- 翻過來看到的正面圖層 -->
                 <div class="flip-back" id="card-front-img"></div>
             </div>
-            <div class="hint-text" id="hint-msg">點擊翻開啟示</div>
+            <div class="hint-text" id="hint-msg">點擊白六牌背翻開啟示</div>
             <button class="btn btn-draw" style="margin-top:30px; display:none;" id="reset-btn" onclick="game.init()">重新開始</button>
         </div>
     </div>
@@ -94,22 +118,22 @@
                 this.deck.sort(() => Math.random() - 0.5);
                 this.rows = [[],[],[],[]]; this.isRowLocked = [false,false,false,false];
                 this.selectedIndices = []; this.currentIndex = 0; this.isGameOver = false;
+                
                 document.getElementById('result-overlay').style.display = 'none';
                 document.getElementById('flip-card').classList.remove('is-flipped');
                 document.getElementById('reset-btn').style.display = 'none';
+                document.getElementById('hint-msg').style.display = 'block';
                 this.render();
             },
 
             getVal(r) { return r === 'A' ? 1 : (r === 'T' ? 10 : parseInt(r)); },
 
-            // 檢查是否存在未處理的消除機會 (提醒功能核心)
             checkForgottenMatches() {
                 for(let i=0; i<4; i++) {
                     const r = this.rows[i], L = r.length;
                     if (L < 3 || this.isRowLocked[i]) continue;
                     const v = r.map(c => this.getVal(c.rank));
                     const check = (a,b,c) => [9,19,29].includes(a+b+c);
-                    // 檢查尾三張、二加一、一加二
                     if (check(v[L-3], v[L-2], v[L-1]) || check(v[0], v[L-2], v[L-1]) || check(v[0], v[1], v[L-1])) return i;
                 }
                 return -1;
@@ -117,13 +141,8 @@
 
             drawNext() {
                 if (this.isGameOver || this.deck.length === 0) return;
-                
-                // 疏失提醒：若有可消除的牌未處理，禁止發牌並閃爍提示
                 const matchIdx = this.checkForgottenMatches();
-                if (matchIdx !== -1) {
-                    this.triggerError(matchIdx);
-                    return;
-                }
+                if (matchIdx !== -1) { this.triggerError(matchIdx); return; }
 
                 while (this.isRowLocked[this.currentIndex]) this.currentIndex = (this.currentIndex + 1) % 4;
                 this.rows[this.currentIndex].push(this.deck.shift());
@@ -134,6 +153,7 @@
 
             handleCardClick(rowIdx, cardIdx) {
                 if (this.isRowLocked[rowIdx]) return;
+                if (this.selectedIndices.length > 0 && this.selectedIndices[0].row !== rowIdx) this.selectedIndices = [];
                 const idx = this.selectedIndices.findIndex(s => s.idx === cardIdx);
                 if (idx !== -1) this.selectedIndices.splice(idx, 1);
                 else if (this.selectedIndices.length < 3) this.selectedIndices.push({row: rowIdx, idx: cardIdx});
@@ -145,15 +165,13 @@
                 const r = this.rows[rowIdx], L = r.length;
                 const sel = this.selectedIndices.map(s => s.idx).sort((a,b)=>a-b);
                 const sum = sel.reduce((acc, i) => acc + this.getVal(r[i].rank), 0);
-                
-                // 檢查是否符合 9/19/29 且位置合法 (必須包含最後一張)
                 const validPos = (sel[0] === L-3 && sel[1] === L-2) || (sel[0] === 0 && sel[1] === L-2) || (sel[0] === 0 && sel[1] === 1);
                 if ([9,19,29].includes(sum) && sel[2] === L-1 && validPos) {
                     const removed = sel.sort((a,b)=>b-a).map(i => r.splice(i, 1)[0]);
                     this.deck.push(...removed.reverse());
                     if (r.length === 0) this.isRowLocked[rowIdx] = true;
                 } else {
-                    this.triggerError(rowIdx); // 選擇錯誤提醒
+                    this.triggerError(rowIdx);
                 }
                 this.selectedIndices = []; this.render();
                 this.checkEndGame();
@@ -168,22 +186,24 @@
             checkEndGame() {
                 const allCards = this.rows.flat();
                 const openRows = this.isRowLocked.filter(l => !l).length;
-                if (openRows === 0) this.prepareReveal(this.deck.shift(), "全消達成！白六的啟示");
-                else if (this.deck.length === 0) {
+                if (openRows === 0 && (this.deck.length > 0 || allCards.length === 0)) {
+                    this.prepareReveal(this.deck[0] || {rank:'A', suit:'S'}, "全消達成！白六的啟示");
+                } else if (this.deck.length === 0) {
                     if (allCards.length === 1) this.prepareReveal(allCards[0], "最終的一張牌");
-                    else this.prepareReveal(allCards[allCards.length-1], "真遺憾，再接再厲！");
+                    else if (allCards.length > 1) this.prepareReveal(allCards[allCards.length-1], "真遺憾，再接再厲！");
                 }
             },
 
             prepareReveal(card, title) {
                 this.isGameOver = true;
                 document.getElementById('result-title').innerText = title;
-                document.getElementById('card-front-img').innerHTML = `<img src="${baseUrl}${card.rank}${card.suit}.svg" style="width:100%">`;
+                document.getElementById('card-front-img').innerHTML = `<img src="${baseUrl}${card.rank}${card.suit}.svg">`;
                 document.getElementById('result-overlay').style.display = 'flex';
             },
 
             flipResult() {
                 document.getElementById('flip-card').classList.add('is-flipped');
+                document.getElementById('hint-msg').style.display = 'none';
                 document.getElementById('reset-btn').style.display = 'inline-block';
             },
 
